@@ -78,7 +78,7 @@ jobs:
           bot_id: ${{ inputs.bot_id }}
           claude_args: |
             --model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --dangerously-skip-permissions
-            ${{ inputs.auto_progress_prompt != '' && format('--append-system-prompt "{0}"', inputs.auto_progress_prompt) || '' }}
+            ${{ inputs.auto_progress_prompt != '' && format('--append-system-prompt {0}', toJSON(inputs.auto_progress_prompt)) || '' }}
           show_full_output: true
 
   # auto-implement ラベルによる自動実装トリガー
@@ -113,7 +113,7 @@ jobs:
           bot_id: ${{ inputs.bot_id }}
           claude_args: |
             --model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --dangerously-skip-permissions
-            ${{ inputs.auto_progress_prompt != '' && format('--append-system-prompt "{0}"', inputs.auto_progress_prompt) || '' }}
+            ${{ inputs.auto_progress_prompt != '' && format('--append-system-prompt {0}', toJSON(inputs.auto_progress_prompt)) || '' }}
           show_full_output: true
           label_trigger: "auto-implement"
 
@@ -130,7 +130,7 @@ jobs:
           # GitHub APIの伝播遅延により、PR作成直後は見つからない可能性がある
           PR_NUMBER=""
           for attempt in 1 2 3; do
-            if ! PR_LIST_OUTPUT=$(gh pr list --state open --json number,headRefName,createdAt 2>&1); then
+            if ! PR_LIST_OUTPUT=$(gh pr list --state open --limit 100 --json number,headRefName,createdAt 2>&1); then
               echo "::warning::Failed to list PRs (attempt $attempt/3): $PR_LIST_OUTPUT"
               if [ "$attempt" -lt 3 ]; then sleep 5; continue; fi
               echo "::warning::Failed to list PRs after 3 attempts. auto:pipeline label not added."
