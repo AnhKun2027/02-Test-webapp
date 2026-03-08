@@ -56,8 +56,6 @@ claude setup-token
 
 表示されたトークン値をリポジトリ Secret に設定する。
 
-> **注意**: OAuth トークンは有効期限がある。長期運用では `ANTHROPIC_API_KEY`（API キー）の使用も検討すること。API キーは [Anthropic Console](https://console.anthropic.com/) の Settings > API Keys から発行できる。`ANTHROPIC_API_KEY` を使う場合は `CLAUDE_CODE_OAUTH_TOKEN` の代わりにワークフローの `anthropic_api_key` パラメータに渡す。
-
 #### REPO_OWNER_PAT の取得
 
 GitHub Personal Access Token。ワークフロー連鎖（GITHUB_TOKEN で作成した PR は他のワークフローをトリガーしない制約の回避）と PR 作成に使用する。
