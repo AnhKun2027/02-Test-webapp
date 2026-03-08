@@ -41,11 +41,13 @@ shared-workflows/
 
 ### 3. ラベルの作成
 
-呼び出し側リポジトリで、自動処理に必要なラベルを一括作成する:
+このリポジトリの `scripts/setup-labels.sh` を使い、呼び出し側リポジトリにラベルを一括作成する:
 
 ```bash
-# リポジトリ名を指定して実行
-./scripts/setup-labels.sh owner/repo
+# shared-workflows リポジトリで実行
+git clone https://github.com/becky3/shared-workflows.git
+cd shared-workflows
+bash scripts/setup-labels.sh owner/repo
 ```
 
 ### 4. 呼び出し側ワークフローの配置
@@ -62,8 +64,8 @@ shared-workflows/
 
 ## バージョニング
 
-呼び出し側は `@main` で参照する:
+呼び出し側は `@main` で参照する（Reusable Workflows は Phase3/4 で追加予定）:
 
 ```yaml
-uses: becky3/shared-workflows/.github/workflows/claude.yml@main
+uses: becky3/shared-workflows/.github/workflows/<workflow>.yml@main
 ```

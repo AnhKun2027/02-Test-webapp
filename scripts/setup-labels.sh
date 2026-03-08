@@ -30,19 +30,26 @@ echo "Creating labels for $REPO..."
 
 CREATED=0
 SKIPPED=0
+FAILED=0
 
 for entry in "${LABELS[@]}"; do
   IFS='|' read -r NAME COLOR DESC <<< "$entry"
 
-  if gh label create "$NAME" --repo "$REPO" --color "$COLOR" --description "$DESC" 2>/dev/null; then
+  if OUTPUT=$(gh label create "$NAME" --repo "$REPO" --color "$COLOR" --description "$DESC" 2>&1); then
     echo "  + $NAME"
     CREATED=$((CREATED + 1))
-  else
-    # 既存ラベルの場合は "already exists" エラーが返る
-    echo "  ~ $NAME (already exists or failed)"
+  elif echo "$OUTPUT" | grep -qi "already exists"; then
+    echo "  ~ $NAME (already exists)"
     SKIPPED=$((SKIPPED + 1))
+  else
+    echo "  ! $NAME (ERROR: $OUTPUT)"
+    FAILED=$((FAILED + 1))
   fi
 done
 
 echo ""
-echo "Done: created=$CREATED, skipped/existing=$SKIPPED"
+echo "Done: created=$CREATED, skipped/existing=$SKIPPED, failed=$FAILED"
+
+if [ "$FAILED" -gt 0 ]; then
+  exit 1
+fi

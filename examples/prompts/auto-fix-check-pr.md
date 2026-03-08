@@ -126,7 +126,7 @@ PR_NUMBER={{PR_NUMBER}}
 
 # owner/repo の取得と検証（環境情報付きエラーログ）
 OWNER=$(gh repo view --json owner --jq '.owner.login' 2>&1) || {
-  echo "::error::Failed to get repository owner: $OWNER (GH_REPO=${GH_REPO:-unset}, GH_TOKEN length=${#GH_TOKEN})"
+  echo "::error::Failed to get repository owner: $OWNER (GH_REPO=${GH_REPO:-unset}, GH_TOKEN length=${#GH_TOKEN:-0})"
   exit 1
 }
 REPO=$(gh repo view --json name --jq '.name' 2>&1) || {

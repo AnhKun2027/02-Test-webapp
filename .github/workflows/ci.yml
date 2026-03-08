@@ -41,24 +41,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find workflow files
-        id: find-workflows
-        run: |
-          WORKFLOWS=$(find .github/workflows -name '*.yml' -not -name 'ci.yml' -type f 2>/dev/null || true)
-          if [ -z "$WORKFLOWS" ]; then
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "No workflow files to lint (excluding ci.yml). Skipping."
-          else
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "Workflows to check:"
-            echo "$WORKFLOWS"
-          fi
-
       - name: Install actionlint
-        if: steps.find-workflows.outputs.found == 'true'
         run: |
           bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
 
       - name: Run actionlint
-        if: steps.find-workflows.outputs.found == 'true'
         run: ./actionlint
