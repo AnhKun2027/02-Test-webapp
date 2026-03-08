@@ -72,13 +72,13 @@ gh api graphql -f query="
 ## ステップ 4/8: テスト実行
 
 注: GA環境ではサブエージェント（test-runner等）が利用できないため、直接実行する。
-プロジェクトに応じたテストコマンドを実行してください。
 
-```bash
-# 例: Python プロジェクトの場合
-# uv run pytest && uv run ruff check src/ tests/ && uv run mypy src/
-# npx markdownlint-cli2@0.20.0 "CLAUDE.md" "docs/**/*.md" "*.md" ".claude/**/*.md"
-```
+リポジトリの構成から適切なテスト・lint コマンドを判断して実行する:
+
+- `pyproject.toml` → pytest / ruff / mypy 等
+- `package.json` → npm test 等
+- `.github/scripts/**/*.sh` → shellcheck
+- `*.md` の変更 → markdownlint
 
 Markdown のみの変更の場合、コードのテスト・lint はスキップ可（markdownlint のみ実行）。
 失敗があれば修正して再実行。全て通過してから次へ進む。

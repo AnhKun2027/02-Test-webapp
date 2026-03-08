@@ -42,17 +42,12 @@ GitHub Actions 環境では Skill ツールを使用しない。以下の4ステ
 
 ### ステップ 1/4: テスト実行
 
-プロジェクトに応じたテスト・lint コマンドを実行する。
+リポジトリの構成から適切なテスト・lint コマンドを判断して実行する:
 
-```bash
-# CRLF → LF 自動変換（Windows 環境の shellcheck SC1017 防止）
-for f in .github/scripts/auto-fix/*.sh .github/scripts/post-merge/*.sh; do [ -f "$f" ] || continue; if grep -q $'\r' "$f" 2>/dev/null; then tmp=$(mktemp) && tr -d '\r' < "$f" > "$tmp" && mv "$tmp" "$f" && echo "[fix] CRLF→LF: $f"; fi; done
-
-# 例: Python プロジェクトの場合
-# uv run pytest && uv run ruff check src/ tests/ && uv run mypy src/
-# npx markdownlint-cli2@0.20.0 "CLAUDE.md" "docs/**/*.md" "*.md" ".claude/**/*.md"
-# uv run shellcheck .github/scripts/auto-fix/*.sh .github/scripts/post-merge/*.sh
-```
+- `pyproject.toml` → pytest / ruff / mypy 等
+- `package.json` → npm test 等
+- `.github/scripts/**/*.sh` → shellcheck（実行前に CRLF → LF 変換を行う）
+- `*.md` の変更 → markdownlint
 
 - Markdown のみの変更の場合、コードのテスト・lint はスキップ可（markdownlint のみ実行）
 - 失敗があれば修正して再実行。全て通過してから次へ進む

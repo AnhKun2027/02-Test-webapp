@@ -54,6 +54,11 @@ jobs:
             echo "$WORKFLOWS"
           fi
 
+      - name: Install actionlint
+        if: steps.find-workflows.outputs.found == 'true'
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+
       - name: Run actionlint
         if: steps.find-workflows.outputs.found == 'true'
-        uses: rhysd/actionlint@v1
+        run: ./actionlint
