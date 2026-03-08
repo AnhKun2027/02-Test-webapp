@@ -314,9 +314,11 @@ jobs:
           PROMPT=$(cat "$TEMPLATE_PATH")
           PROMPT="${PROMPT//\{\{PR_NUMBER\}\}/$PR_NUMBER}"
 
-          echo "prompt<<PROMPT_EOF" >> "$GITHUB_OUTPUT"
-          echo "$PROMPT" >> "$GITHUB_OUTPUT"
-          echo "PROMPT_EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "prompt<<PROMPT_EOF"
+            echo "$PROMPT"
+            echo "PROMPT_EOF"
+          } >> "$GITHUB_OUTPUT"
         env:
           PR_NUMBER: ${{ steps.pr-info.outputs.number }}
 
