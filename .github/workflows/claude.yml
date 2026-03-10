@@ -113,9 +113,10 @@ jobs:
           bot_id: ${{ inputs.bot_id }}
           claude_args: |
             --model ${{ inputs.model }} --max-turns ${{ inputs.max_turns }} --dangerously-skip-permissions
-            ${{ inputs.auto_progress_prompt != '' && format('--append-system-prompt {0}', toJSON(inputs.auto_progress_prompt)) || '' }}
           show_full_output: true
           label_trigger: "auto-implement"
+        env:
+          APPEND_SYSTEM_PROMPT: ${{ inputs.auto_progress_prompt }}
 
       # auto:pipeline ラベルを付与（検索・フィルタ用。ワークフロー制御には使用しない）
       # ワークフロー制御は auto/ ブランチプレフィックスで判定（branch_prefix パラメータ）
