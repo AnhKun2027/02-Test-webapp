@@ -9,7 +9,7 @@
 #
 # 呼び出し側の要件:
 #   - permissions: contents: read, pull-requests: write, issues: write
-#   - secrets: なし（GITHUB_TOKEN で動作）
+#   - secrets: REPO_OWNER_PAT（スレッド resolve に必要）
 #   - トリガーイベント: schedule, workflow_dispatch
 #
 # エラーハンドリング方針:
@@ -28,6 +28,9 @@ on:
         required: false
         type: number
         default: 24
+    secrets:
+      REPO_OWNER_PAT:
+        required: true
 
 permissions:
   contents: read
@@ -52,6 +55,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           SCAN_HOURS: ${{ inputs.scan_hours }}
+          RESOLVE_TOKEN: ${{ secrets.REPO_OWNER_PAT }}
 
 concurrency:
   group: late-review-scanner-${{ github.repository }}
