@@ -6,7 +6,6 @@
 # Required secrets (set in the caller repository):
 #   - CLAUDE_CODE_OAUTH_TOKEN
 #   - REPO_OWNER_PAT
-#   - SLACK_WEBHOOK_URL (optional)
 #
 # Required variables (optional, set in the caller repository):
 #   - COPILOT_REVIEW_TIMEOUT (default: 600 seconds)

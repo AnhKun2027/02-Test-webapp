@@ -9,7 +9,7 @@
 #
 # 呼び出し側の要件:
 #   - permissions: contents: read, pull-requests: write, issues: write, id-token: write
-#   - secrets: (SLACK_WEBHOOK_URL)
+#   - secrets: なし（GITHUB_TOKEN で動作）
 #   - トリガーイベント: pull_request[closed]
 #
 # 処理内容:
@@ -22,9 +22,6 @@ name: Post Merge
 
 on:
   workflow_call:
-    secrets:
-      SLACK_WEBHOOK_URL:
-        required: false
 
 permissions:
   contents: read
@@ -57,18 +54,6 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
 
-      # Slack通知（失敗時のみ）
-      - name: Slack notification
-        if: failure()
-        continue-on-error: true
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow
-          mention: here
-          if_mention: failure
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 concurrency:
   group: post-merge-pr-${{ github.event.pull_request.number }}
