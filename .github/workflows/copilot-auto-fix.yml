@@ -9,7 +9,7 @@
 #
 # 呼び出し側の要件:
 #   - permissions: contents: write, pull-requests: write, issues: write, checks: read, actions: read, id-token: write
-#   - secrets: CLAUDE_CODE_OAUTH_TOKEN, REPO_OWNER_PAT, (SLACK_WEBHOOK_URL)
+#   - secrets: CLAUDE_CODE_OAUTH_TOKEN, REPO_OWNER_PAT
 #   - トリガーイベント: pull_request[opened], workflow_dispatch
 #   - プロンプトテンプレート: .github/prompts/auto-fix-check-pr.md（caller リポに配置）
 #
@@ -64,8 +64,6 @@ on:
         required: true
       REPO_OWNER_PAT:
         required: true
-      SLACK_WEBHOOK_URL:
-        required: false
 
 permissions:
   contents: write
@@ -486,18 +484,6 @@ jobs:
           ACTIONS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMON_SCRIPT_PATH: ${{ github.workspace }}/.shared/.github/scripts/auto-fix/_common.sh
 
-      # Slack通知（失敗時のみ）
-      - name: Slack notification
-        if: failure()
-        continue-on-error: true
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow
-          mention: here
-          if_mention: failure
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 concurrency:
   group: copilot-auto-fix-pr-${{ github.event.pull_request.number || github.event.inputs.pr_number }}

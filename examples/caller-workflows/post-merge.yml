@@ -3,8 +3,7 @@
 # This file should be placed in the caller repository as:
 #   .github/workflows/post-merge.yml
 #
-# Required secrets (set in the caller repository):
-#   - SLACK_WEBHOOK_URL (optional)
+# No secrets required (runs with GITHUB_TOKEN).
 
 name: Post Merge
 
