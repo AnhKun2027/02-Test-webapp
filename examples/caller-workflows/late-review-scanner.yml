@@ -3,7 +3,8 @@
 # This file should be placed in the caller repository as:
 #   .github/workflows/late-review-scanner.yml
 #
-# No secrets required (runs with GITHUB_TOKEN).
+# Required secrets:
+#   - REPO_OWNER_PAT (for resolving review threads on merged PRs)
 
 name: Late Review Scanner
 

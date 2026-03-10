@@ -4,9 +4,10 @@
 # 設計書: docs/specs/late-review-scanner.md
 #
 # 必須環境変数:
-#   GH_TOKEN        — GitHub トークン
+#   GH_TOKEN        — GitHub トークン（読み取り・Issue 操作用）
 #   GH_REPO         — リポジトリ (owner/repo)
 #   GITHUB_REPOSITORY — リポジトリ (owner/repo)（GraphQL用）
+#   RESOLVE_TOKEN   — スレッド resolve 用トークン（PAT）
 #
 # 任意環境変数:
 #   SCAN_HOURS      — スキャン範囲（デフォルト: 24）
@@ -22,7 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/../auto-fix/_common.sh"
 
-require_env GH_TOKEN GH_REPO GITHUB_REPOSITORY
+require_env GH_TOKEN GH_REPO GITHUB_REPOSITORY RESOLVE_TOKEN
 
 SCAN_HOURS="${SCAN_HOURS:-24}"
 if ! validate_numeric "$SCAN_HOURS" "SCAN_HOURS"; then
@@ -254,7 +255,7 @@ ${COMMENT_LINKS}"
       continue
     fi
 
-    if ! ERROR=$(gh api graphql -f query="
+    if ! ERROR=$(GH_TOKEN="$RESOLVE_TOKEN" gh api graphql -f query="
     mutation {
       resolveReviewThread(input: { threadId: \"$THREAD_ID\" }) {
         thread { isResolved }
