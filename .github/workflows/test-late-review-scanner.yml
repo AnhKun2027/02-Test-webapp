@@ -1,0 +1,17 @@
+# Temporary caller for E2E testing — DELETE AFTER TEST
+name: "Test: Late Review Scanner"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    uses: becky3/shared-workflows/.github/workflows/late-review-scanner.yml@main
+    with:
+      scan_hours: 168
+    secrets: inherit
