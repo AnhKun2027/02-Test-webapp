@@ -56,9 +56,9 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           SCAN_HOURS: ${{ inputs.scan_hours }}
 
-      # Slack通知（失敗時のみ）
+      # Slack通知（失敗時のみ & Webhook設定時のみ）
       - name: Slack notification
-        if: failure()
+        if: failure() && secrets.SLACK_WEBHOOK_URL != ''
         continue-on-error: true
         uses: 8398a7/action-slack@v3
         with:

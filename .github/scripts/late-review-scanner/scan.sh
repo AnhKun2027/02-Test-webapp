@@ -51,7 +51,7 @@ echo "Scanning for merged PRs since $SINCE (last ${SCAN_HOURS}h)..."
 MERGED_PRS=""
 if ! MERGED_PRS=$(gh pr list --repo "$GH_REPO" --state merged \
   --json number,title,mergedAt --limit 100 \
-  --jq "[.[] | select(.mergedAt >= \"$SINCE\")] | .[] | \"\(.number)\t\(.title)\"" 2>&1); then
+  --jq "[.[] | select(.mergedAt >= \"$SINCE\")] | .[] | {number, title} | @json" 2>&1); then
   # 認証エラーチェック
   if echo "$MERGED_PRS" | grep -qiE '(401|403|authentication|forbidden|resource not accessible)'; then
     echo "::error::Authentication/permission error: $MERGED_PRS"
@@ -76,7 +76,10 @@ trap 'rm -f "$RESULTS_FILE"' EXIT
 
 TOTAL_THREADS=0
 
-while IFS=$'\t' read -r PR_NUMBER PR_TITLE; do
+while IFS= read -r PR_LINE; do
+  [ -z "$PR_LINE" ] && continue
+  PR_NUMBER=$(echo "$PR_LINE" | jq -r '.number')
+  PR_TITLE=$(echo "$PR_LINE" | jq -r '.title')
   [ -z "$PR_NUMBER" ] && continue
 
   echo ""
