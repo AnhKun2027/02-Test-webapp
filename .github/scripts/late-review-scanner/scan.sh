@@ -83,8 +83,8 @@ while IFS=$'\t' read -r PR_NUMBER PR_TITLE; do
   echo "--- PR #$PR_NUMBER: $PR_TITLE ---"
 
   # GraphQL で未解決レビュースレッドを取得
-  # shellcheck disable=SC2016
   THREADS_JSON=""
+  # shellcheck disable=SC2016
   if ! THREADS_JSON=$(gh api graphql -f query='
     query($owner: String!, $name: String!, $number: Int!) {
       repository(owner: $owner, name: $name) {
