@@ -12,14 +12,15 @@
    - なし + Issue具体的: 仕様書なしで直接実装に着手する
    - なし + Issue曖昧: `auto:failed` 付与、不明点をIssueにコメントして停止
 3. 通常の開発ルール（仕様駆動開発）に従って実装
-4. 実装完了後、通常の手順でPR作成まで行う
+4. 実装完了後、通常の手順でPR作成まで行う（ベースブランチは `main`）
 5. ラベル更新:
    - 実装開始時: `auto-implement` ラベルを除去
    - 失敗時: `auto:failed` 付与
 
 ## Git運用
 
-- PRのベースブランチはプロジェクトのブランチ戦略に従う
+- PRのベースブランチは `main`（`gh pr create --base main`）
+- `develop` ブランチは使用しない
 - ブランチ命名規則は既存ルールを踏襲
 
 ## Issue具体性の判定
@@ -78,7 +79,7 @@ GitHub Actions 環境では Skill ツールを使用しない。以下の4ステ
 4. 変更内容からコミットメッセージ自動生成（優先順位: fix > feat > docs > ci）
 5. `git commit -m "生成したメッセージ"`
 6. `BRANCH=$(git branch --show-current) && git push origin "$BRANCH"`
-7. `.github/pull_request_template.md` が存在する場合はその形式に従い、PR を作成する
+7. `.github/pull_request_template.md` が存在する場合はその形式に従い、PR を作成する（`gh pr create --base main`）
 8. `gh issue comment <Issue番号> --body "対応が完了しました。PR #<PR番号> をご確認ください。"`
 
 エラー時: ステップ1-7は失敗で停止。ステップ8は警告して続行（PRは作成済み）。
@@ -102,7 +103,7 @@ commitが成功していない状態でpushしないこと。
 
 **タスク完了時の必須アクション**:
 
-- 実装や設計書の作成を依頼された場合は、**必ず PR を作成すること**
+- 実装や設計書の作成を依頼された場合は、**必ず PR を作成すること**（`gh pr create --base main`）
   - 調査のみ・設計案の提示のみの場合は PR 不要（Issue コメントで回答する）
 - PRを作成したら、必ず対応したIssueに「新規コメント」として完了報告を投稿すること
 - 既存コメントの編集ではなく、新しいコメントを追加する（編集では通知が飛ばないため）
