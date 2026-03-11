@@ -9,6 +9,7 @@
 #   EXCLUDE_CHECK   — （任意）CI チェック除外名。自ワークフローの自己参照防止用
 #   FORBIDDEN_DETECTED — （任意）禁止パターン検出結果。"true" の場合マージ拒否
 #   FORBIDDEN_FILES  — （任意）禁止パターン該当ファイル一覧（multiline）。REASONS に含める
+#   REVIEW_SKIPPED  — （任意）"true" の場合、レビュースキップ（タイムアウト）として条件2をスキップ
 #
 # 出力（$GITHUB_OUTPUT）:
 #   merge_ready     — "true" / "false"
@@ -40,8 +41,26 @@ else
   echo "✅ Condition 1: PR is OPEN"
 fi
 
+# ラベル取得（条件2のレビュースキップ判定と条件5の auto:failed 判定で共用）
+LABELS_FETCHED=false
+if LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>&1); then
+  LABELS_FETCHED=true
+else
+  MERGE_READY=false
+  REASONS="${REASONS}\n- ❌ GitHub API error: Cannot verify labels"
+  echo "::warning::Failed to retrieve labels (API error): $LABELS"
+  echo "❌ Label check: API error"
+  LABELS=""
+fi
+
 # 条件2: レビュー指摘ゼロ（既に has_issues=false で確認済み）
-echo "✅ Condition 2: No review issues"
+# レビュースキップ時（auto:review-skipped ラベルあり）は条件2をスキップ
+# REVIEW_SKIPPED 環境変数が設定されていない場合はラベルにフォールバック
+if [ "${REVIEW_SKIPPED:-}" = "true" ] || echo "$LABELS" | grep -q "^auto:review-skipped$"; then
+  echo "⏭️ Condition 2: Review skipped (timeout) — waived"
+else
+  echo "✅ Condition 2: No review issues"
+fi
 
 # 条件3: CI全チェック通過（GitHub API の statusCheckRollup を使用）
 # EXCLUDE_CHECK が設定されている場合、そのチェック名を除外する
@@ -121,12 +140,9 @@ else
   echo "✅ Condition 4: No conflicts"
 fi
 
-# 条件5: auto:failed ラベルなし（方針: 一時的API障害 → 安全側に倒してマージ拒否）
-if ! LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>&1); then
-  MERGE_READY=false
-  REASONS="${REASONS}\n- ❌ GitHub API error: Cannot verify labels"
-  echo "::warning::Failed to retrieve labels (API error): $LABELS"
-  echo "❌ Condition 5: API error (not label issue)"
+# 条件5: auto:failed ラベルなし（LABELS は条件2の前に取得済み）
+if [ "$LABELS_FETCHED" != "true" ]; then
+  echo "❌ Condition 5: Skipped (label fetch failed earlier)"
 elif echo "$LABELS" | grep -q "^auto:failed$"; then
   MERGE_READY=false
   REASONS="${REASONS}\n- ❌ auto:failed label present"
