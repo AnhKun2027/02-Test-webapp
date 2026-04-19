@@ -12,26 +12,26 @@ name: Quality Check
 on:
   workflow_call:
     inputs:
-      python-version:
+      python_version:
         description: 'Python version'
         required: false
         type: string
         default: '3.11'
-      install-command:
+      install_command:
         description: 'Dependency install command (e.g. "uv sync")'
         required: true
         type: string
-      test-command:
+      test_command:
         description: 'Test command (e.g. "uv run pytest"). Empty to skip'
         required: false
         type: string
         default: ''
-      lint-command:
+      lint_command:
         description: 'Lint command (e.g. "uv run ruff check src/ tests/"). Empty to skip'
         required: false
         type: string
         default: ''
-      typecheck-command:
+      typecheck_command:
         description: 'Type check command (e.g. "uv run mypy src/"). Empty to skip'
         required: false
         type: string
@@ -41,7 +41,7 @@ on:
         required: false
         type: boolean
         default: false
-      markdownlint-globs:
+      markdownlint_globs:
         description: 'Glob patterns for markdownlint'
         required: false
         type: string
@@ -53,7 +53,7 @@ permissions:
 jobs:
   lint:
     name: Lint
-    if: inputs.lint-command != ''
+    if: inputs.lint_command != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,17 +62,17 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ inputs.python_version }}
 
       - name: Install dependencies
-        run: ${{ inputs.install-command }}
+        run: ${{ inputs.install_command }}
 
       - name: Run lint
-        run: ${{ inputs.lint-command }}
+        run: ${{ inputs.lint_command }}
 
   typecheck:
     name: Type Check
-    if: inputs.typecheck-command != ''
+    if: inputs.typecheck_command != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,17 +81,17 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ inputs.python_version }}
 
       - name: Install dependencies
-        run: ${{ inputs.install-command }}
+        run: ${{ inputs.install_command }}
 
       - name: Run type check
-        run: ${{ inputs.typecheck-command }}
+        run: ${{ inputs.typecheck_command }}
 
   test:
     name: Test
-    if: inputs.test-command != ''
+    if: inputs.test_command != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -100,13 +100,13 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ inputs.python_version }}
 
       - name: Install dependencies
-        run: ${{ inputs.install-command }}
+        run: ${{ inputs.install_command }}
 
       - name: Run tests
-        run: ${{ inputs.test-command }}
+        run: ${{ inputs.test_command }}
 
   markdownlint:
     name: Markdown Lint
@@ -123,4 +123,4 @@ jobs:
         run: npm install -g markdownlint-cli2
 
       - name: Run markdownlint
-        run: markdownlint-cli2 ${{ inputs.markdownlint-globs }}
+        run: markdownlint-cli2 ${{ inputs.markdownlint_globs }}

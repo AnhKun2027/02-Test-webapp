@@ -43,13 +43,13 @@ PR に対して品質チェック（テスト・lint・型チェック・markdow
 
 | input | 型 | 必須 | デフォルト | 説明 |
 | --- | --- | --- | --- | --- |
-| `python-version` | string | No | `"3.11"` | Python バージョン |
-| `install-command` | string | Yes | — | 依存インストールコマンド（例: `uv sync`） |
-| `test-command` | string | No | `""` | テストコマンド（例: `uv run pytest`）。空でスキップ |
-| `lint-command` | string | No | `""` | lint コマンド（例: `uv run ruff check src/ tests/`）。空でスキップ |
-| `typecheck-command` | string | No | `""` | 型チェックコマンド（例: `uv run mypy src/`）。空でスキップ |
+| `python_version` | string | No | `"3.11"` | Python バージョン |
+| `install_command` | string | Yes | — | 依存インストールコマンド（例: `uv sync`） |
+| `test_command` | string | No | `""` | テストコマンド（例: `uv run pytest`）。空でスキップ |
+| `lint_command` | string | No | `""` | lint コマンド（例: `uv run ruff check src/ tests/`）。空でスキップ |
+| `typecheck_command` | string | No | `""` | 型チェックコマンド（例: `uv run mypy src/`）。空でスキップ |
 | `markdownlint` | boolean | No | `false` | markdownlint を実行するか |
-| `markdownlint-globs` | string | No | `"**/*.md"` | markdownlint の対象 glob パターン |
+| `markdownlint_globs` | string | No | `"**/*.md"` | markdownlint の対象 glob パターン |
 
 ## 処理フロー
 

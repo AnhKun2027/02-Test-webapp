@@ -20,10 +20,10 @@ jobs:
   quality:
     uses: becky3/shared-workflows/.github/workflows/quality-check.yml@main
     with:
-      python-version: "3.11"
-      install-command: "uv sync"
-      test-command: "uv run pytest"
-      lint-command: "uv run ruff check src/ tests/"
-      typecheck-command: "uv run mypy src/"
+      python_version: "3.11"
+      install_command: "uv sync"
+      test_command: "uv run pytest"
+      lint_command: "uv run ruff check src/ tests/"
+      typecheck_command: "uv run mypy src/"
       markdownlint: true
-      # markdownlint-globs: "**/*.md"  # default
+      # markdownlint_globs: "**/*.md"  # default
