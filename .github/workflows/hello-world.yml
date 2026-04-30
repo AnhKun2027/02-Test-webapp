@@ -1,0 +1,26 @@
+name: Hello World
+
+on:
+  workflow_call:
+    inputs:
+      message:
+        description: 'Message to print'
+        required: false
+        type: string
+        default: 'Hello from local reusable workflow!'
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Print message
+        run: echo "${{ inputs.message }}"
+
+      - name: Show repo info
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"

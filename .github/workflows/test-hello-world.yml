@@ -1,0 +1,14 @@
+name: Test Hello World
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    uses: ./.github/workflows/hello-world.yml
+    with:
+      message: "Hello! Testing local reusable workflow 🎉"
