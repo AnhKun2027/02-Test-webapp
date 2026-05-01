@@ -684,6 +684,60 @@ body {
 }
 
 /* ========================================
+   SELECTION SEARCH
+   ======================================== */
+.selection-search-wrapper {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.selection-search-input {
+  width: 100%;
+  padding: 8px 32px 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  color: #333;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.selection-search-input::placeholder {
+  color: #aaa;
+}
+
+.selection-search-input:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.selection-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.selection-search-clear:hover {
+  color: #555;
+}
+
+.selection-search-no-results {
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  padding: 20px 0;
+}
+
+/* ========================================
    SELECTION ITEMS
    ======================================== */
 .selection-item {

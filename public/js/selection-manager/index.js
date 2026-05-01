@@ -57,6 +57,12 @@ export {
   toggleSelBoxes,
 } from './selection-badges.js';
 
+// === Re-export from selection-search.js ===
+export {
+  applySelectionSearchFilter,
+  initSelectionSearch,
+} from './selection-search.js';
+
 // === Re-export from selection-ai.js ===
 export {
   captureAndUploadPendingSelections,
@@ -69,6 +75,7 @@ import { deleteSelection, showOnlySelection, showAllSelections } from './selecti
 import { copySelection, downloadSelection } from './selection-clipboard.js';
 import { updateSelectionCount, updatePendingBadge, updateAiBadge, toggleVnOverlay, toggleSelBoxes } from './selection-badges.js';
 import { captureAndUploadPendingSelections, hasPendingSelections } from './selection-ai.js';
+import { applySelectionSearchFilter, initSelectionSearch } from './selection-search.js';
 
 // === Window assignments (preserve original global API) ===
 window.initSelectionManager = initSelectionManager;
@@ -90,9 +97,12 @@ window.updateAiBadge = updateAiBadge;
 window.toggleVnOverlay = toggleVnOverlay;
 window.toggleSelBoxes = toggleSelBoxes;
 
+window.applySelectionSearchFilter = applySelectionSearchFilter;
+
 // Initialize when DOM ready
 function _initSelections() {
   initSelectionManager();
+  initSelectionSearch();
   const vnBtn = document.getElementById('toggleVnOverlayBtn');
   if (vnBtn) vnBtn.addEventListener('click', toggleVnOverlay);
   const selBtn = document.getElementById('toggleSelBoxesBtn');

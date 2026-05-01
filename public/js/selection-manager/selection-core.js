@@ -8,6 +8,7 @@ import { updateRotateButtonState } from '../page-utils.js';
 import { getSelectionFields, queueSelection, showOnlySelection, showAllSelections, getCurrentFileId } from './selection-actions.js';
 import { createSelectionSidebarElement, calculateAutoFontSize } from './selection-sidebar.js';
 import { updateSelectionCount, updateAiBadge } from './selection-badges.js';
+import { applySelectionSearchFilter } from './selection-search.js';
 import { showSelectionContextMenu } from './selection-context-menu.js';
 
 // Constants
@@ -303,6 +304,7 @@ export function renderSelectionsForCurrentPage() {
   updateSelectionCount();
   updateRotateButtonState();
   updateAiBadge();
+  applySelectionSearchFilter();
 
   requestAnimationFrame(() => {
     const activeId = window.activeSelectionId;
