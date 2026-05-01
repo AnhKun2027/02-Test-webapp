@@ -1,0 +1,12 @@
+{
+  "name": "checkcongviec-desktop",
+  "version": "1.0.0",
+  "description": "CheckCongViec Desktop App - Electron wrapper",
+  "private": true,
+  "scripts": {
+    "electron:dev": "cd electron && node start-dev.js --dev",
+    "electron:dev:session": "cd electron && node start-dev.js --dev --messageId=19cd2dfa86bfb9dd",
+    "electron:build": "cd electron && npx electron-builder --win",
+    "electron:install": "cd electron && npm install"
+  }
+}
