@@ -71,6 +71,7 @@ jobs:
 
       # agent-commons の共通 .claude/ をマージ（agents, skills, rules 等）
       - name: Checkout agent-commons
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: becky3/agent-commons
@@ -131,6 +132,7 @@ jobs:
 
       # agent-commons の共通 .claude/ をマージ（agents, skills, rules 等）
       - name: Checkout agent-commons
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: becky3/agent-commons
