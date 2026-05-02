@@ -1,0 +1,6 @@
+bash.exe.stackdump
+.claude/settings.local.json
+.pr-creation-authorized
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+.playwright-mcp/

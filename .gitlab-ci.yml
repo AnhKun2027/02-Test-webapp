@@ -1,0 +1,187 @@
+# GitLab CI/CD Pipeline
+# Migrated from GitHub Actions (.github/workflows/)
+#
+# Workflow mapping:
+#   ci.yml                    → jobs: shellcheck, gitlab-ci-lint
+#   quality-check.yml         → jobs: quality-test, quality-markdownlint
+#   claude.yml                → job:  claude              (manual / MR manual play)
+#   claude.yml (auto-impl)    → job:  auto-implement      (scheduled polling)
+#   late-review-scanner*.yml  → job:  late-review-scan    (scheduled)
+#   post-merge*.yml           → job:  post-merge          (push to main after merge)
+#
+# NOT migrated:
+#   copilot-auto-fix*.yml     — GitHub Copilot (no GitLab equivalent)
+#
+# Required CI/CD variables (set in GitLab → Settings → CI/CD → Variables):
+#   GITLAB_TOKEN              — personal access token (api scope) for glab/curl scripts
+#   CLAUDE_CODE_OAUTH_TOKEN   — Claude Max plan OAuth token (claude setup-token)
+#
+# Required pipeline schedules (set in GitLab → CI/CD → Schedules):
+#   late-review-scan:  cron "0 * * * *"    (every hour),    branch: main
+#   auto-implement:    cron "*/5 * * * *"   (every 5 min),   branch: main
+#
+# Bootstrap (run once):
+#   bash .gitlab/scripts/setup-labels.sh   # creates auto:* labels
+
+stages:
+  - lint
+  - quality
+  - ai
+  - scan
+  - post-merge
+
+default:
+  interruptible: true
+
+# Prevent double pipelines (branch + MR for the same commit)
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+include:
+  - local: '.gitlab/ci/quality-check.yml'
+  - local: '.gitlab/ci/late-review-scanner.yml'
+  - local: '.gitlab/ci/post-merge.yml'
+  - local: '.gitlab/ci/claude.yml'
+  - local: '.gitlab/ci/auto-implement.yml'
+  - local: '.gitlab/ci/auto-fix.yml'
+  - local: '.gitlab/ci/self-ci.yml'
+
+# =============================================================================
+# LINT STAGE
+# Mirrors: .github/workflows/ci.yml
+# Triggers: push to main, MR targeting main
+# =============================================================================
+
+shellcheck:
+  stage: lint
+  image: koalaman/shellcheck-alpine:stable
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+  script:
+    - |
+      SCRIPTS=$(find .gitlab/scripts scripts -name '*.sh' -type f 2>/dev/null || true)
+      if [ -z "$SCRIPTS" ]; then
+        echo "No shell scripts found. Skipping shellcheck."
+        exit 0
+      fi
+      echo "Scripts to check:"
+      echo "$SCRIPTS"
+      echo "$SCRIPTS" | xargs shellcheck
+
+# GitLab CI lint — đối ứng với actionlint của GitHub
+# Validate cú pháp .gitlab-ci.yml qua API /ci/lint
+gitlab-ci-lint:
+  stage: lint
+  image: alpine:latest
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+  script:
+    - apk add --no-cache curl jq
+    - |
+      # API /ci/lint yêu cầu Content-Type: application/json với body {"content": "..."}
+      # KHÔNG nhận multipart form-data (-F) — sẽ trả "content is invalid"
+      PAYLOAD=$(jq -Rs '{content: .}' < .gitlab-ci.yml)
+      RESPONSE=$(curl -s -X POST \
+        -H "PRIVATE-TOKEN: ${GITLAB_TOKEN:-$CI_JOB_TOKEN}" \
+        -H "Content-Type: application/json" \
+        --data "$PAYLOAD" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/ci/lint")
+      echo "$RESPONSE" | jq .
+      # API không tự resolve `include: local:` khi nhận content, nên lỗi
+      # "Local file ... does not exist!" là false positive — bỏ qua.
+      # Mục tiêu của job này (giống actionlint của GitHub) chỉ là check syntax.
+      REAL_ERRORS=$(echo "$RESPONSE" | jq -r '.errors[]?' | grep -v -E '^Local file .* does not exist!$' || true)
+      if [ -n "$REAL_ERRORS" ]; then
+        echo "ERROR: .gitlab-ci.yml has syntax errors:"
+        echo "$REAL_ERRORS"
+        exit 1
+      fi
+      echo "OK: .gitlab-ci.yml syntax is valid (local includes not validated by API)"
+
+# =============================================================================
+# QUALITY STAGE
+# Mirrors: .github/workflows/quality-check.yml (caller)
+# Triggers: MR targeting main only
+# =============================================================================
+
+# =============================================================================
+# AI STAGE
+# Mirrors: .github/workflows/claude.yml (anthropics/claude-code-action)
+# Triggers: manual (web run) or manual play button on MR pipeline
+# Required CI/CD variable: CLAUDE_CODE_OAUTH_TOKEN (masked, from claude setup-token)
+# Doc: https://code.claude.com/docs/en/gitlab-ci-cd
+# =============================================================================
+
+claude:
+  stage: ai
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+      when: manual
+      allow_failure: true
+  extends: .job_claude
+
+# =============================================================================
+# AUTO-IMPLEMENT STAGE
+# Mirrors: .github/workflows/claude.yml (claude-auto-implement job)
+# Triggers: scheduled pipeline (every 5 min) — polls for issues with "auto-implement" label
+# Setup: pipeline schedule already created at cron "*/5 * * * *" targeting main
+# =============================================================================
+
+auto-implement:
+  stage: ai
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+      allow_failure: true
+  extends: .job_auto_implement
+
+# NOTE: quality-test omitted — this project has no `npm test` script.
+# To enable in another project, add:
+#   quality-test:
+#     stage: quality
+#     rules:
+#       - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+#     extends: .job_install_and_test
+
+quality-markdownlint:
+  stage: quality
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+  extends: .job_markdownlint
+
+# =============================================================================
+# SCAN STAGE
+# Mirrors: .github/workflows/late-review-scanner-caller.yml
+# Triggers: scheduled pipeline (every hour) or manual web trigger
+# Setup: create a pipeline schedule at cron "0 * * * *" targeting main
+# =============================================================================
+
+late-review-scan:
+  stage: scan
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  extends: .job_late_review_scan
+  variables:
+    SCAN_HOURS: "24"
+
+# =============================================================================
+# POST-MERGE STAGE
+# Mirrors: .github/workflows/post-merge-caller.yml
+# Triggers: push to main (after MR merge), only when merge commit has auto:merged label
+# The script checks for the label via the GitLab API before processing.
+# =============================================================================
+
+post-merge:
+  stage: post-merge
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+  extends: .job_post_merge

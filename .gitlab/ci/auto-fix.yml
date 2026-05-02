@@ -1,0 +1,269 @@
+# Claude Auto Fix — Reusable template (Option 2 flow)
+# Replaces the previous Duo-only pipeline. Claude Code reviews the MR first
+# and decides whether to fix directly, escalate to Duo for a second opinion,
+# or skip fixing entirely.
+#
+# Trigger: MR opened/updated on auto/* source branch targeting main.
+#
+# Required CI/CD variables (Settings -> CI/CD -> Variables):
+#   DUO_AUTO_FIX_PAT         — PAT (api, read_repository, write_repository).
+#   CLAUDE_CODE_OAUTH_TOKEN  — OAuth token for Claude Code CLI.
+#   AUTO_MERGE_ENABLED       — "true" to actually merge, anything else dry-run.
+#
+# Optional variables:
+#   CLAUDE_CONFIDENCE_THRESHOLD — minimum confidence (default 80) below which
+#                                 auto_fix is demoted to escalate.
+#   CLAUDE_AUTO_FIX_MAX_LINES   — max diff size for auto_fix (default 200).
+#
+# Pipeline flow (all jobs in 'ai' stage):
+#   1.  claude-review            — Claude reviews -> review.json
+#   2.  classify-decision        — Apply business rules -> review.env (dotenv)
+#   3a. claude-fix-auto          — DECISION=auto_fix: Claude applies fix
+#   3b. duo-review               — DECISION=escalate: assign + wait for Duo
+#   3c. claude-fix-with-guidance — DECISION=escalate: Claude reads Duo notes
+#                                  and applies fix
+#   (DECISION=no_action skips all three)
+#   4.  resolve-threads          — Resolve any still-open threads
+#   5.  check-forbidden          — Block on secret/lockfile changes
+#   6.  check-loop-count         — Cap auto-fix iterations
+#   7.  wait-for-ci              — Wait for build/test pipeline
+#   8.  merge-check              — Verify merge gating conditions
+#   9.  merge-or-dryrun          — Real merge or dry-run notice
+#   10. handle-error             — on_failure: report + label auto:failed
+
+.auto_fix_base:
+  image: node:22-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends curl jq ca-certificates git
+    - npm install -g @anthropic-ai/claude-code
+  variables:
+    GL_TOKEN: "$DUO_AUTO_FIX_PAT"
+    MAX_LOOP_COUNT: "3"
+    CI_WAIT_TIMEOUT: "900"
+    CI_WAIT_INTERVAL: "30"
+    AUTO_MERGE_ENABLED: "$AUTO_MERGE_ENABLED"
+    CLAUDE_CONFIDENCE_THRESHOLD: "80"
+    CLAUDE_AUTO_FIX_MAX_LINES: "200"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^auto\//'
+
+# Variant that also installs glab (used by merge-or-dryrun).
+.auto_fix_with_glab:
+  extends: .auto_fix_base
+  before_script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends curl jq ca-certificates git
+    - npm install -g @anthropic-ai/claude-code
+    - |
+      if ! command -v glab >/dev/null 2>&1; then
+        GLAB_VER="1.46.1"
+        curl -fsSL -o /tmp/glab.tar.gz \
+          "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VER}/downloads/glab_${GLAB_VER}_Linux_x86_64.tar.gz"
+        tar -xzf /tmp/glab.tar.gz -C /tmp
+        install -m 0755 /tmp/bin/glab /usr/local/bin/glab
+      fi
+    - glab --version || true
+
+# ---------------------------------------------------------------------------
+# Step 1 — Claude reviews the MR and emits structured JSON.
+# ---------------------------------------------------------------------------
+
+claude-review:
+  extends: .auto_fix_base
+  stage: ai
+  variables:
+    GL_TOKEN: "$DUO_AUTO_FIX_PAT"
+    CLAUDE_CODE_OAUTH_TOKEN: "$CLAUDE_CODE_OAUTH_TOKEN"
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/claude-review.sh"
+  artifacts:
+    paths:
+      - review.json
+    expire_in: 1 day
+
+# ---------------------------------------------------------------------------
+# Step 2 — Classify decision and propagate via dotenv.
+# ---------------------------------------------------------------------------
+
+classify-decision:
+  extends: .auto_fix_base
+  stage: ai
+  needs: [claude-review]
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/classify-decision.sh"
+  artifacts:
+    paths:
+      - review.json
+    reports:
+      dotenv: review.env
+    expire_in: 1 day
+
+# ---------------------------------------------------------------------------
+# Branch A — auto_fix: Claude applies the fix directly.
+# ---------------------------------------------------------------------------
+
+claude-fix-auto:
+  extends: .auto_fix_base
+  stage: ai
+  needs: [classify-decision]
+  variables:
+    GL_TOKEN: "$DUO_AUTO_FIX_PAT"
+    CLAUDE_CODE_OAUTH_TOKEN: "$CLAUDE_CODE_OAUTH_TOKEN"
+  # C3 fix: dotenv variables CANNOT be used in rules:if (GitLab limitation).
+  # Use script-level skip instead — the job is always created, but exits early
+  # if DECISION mismatches. Source: https://gitlab.com/gitlab-org/gitlab/-/issues/352828
+  script:
+    - |
+      if [ "${DECISION:-}" != "auto_fix" ]; then
+        echo "Skipping claude-fix-auto (DECISION='${DECISION:-unset}', expected 'auto_fix')"
+        exit 0
+      fi
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/claude-apply-fix.sh" auto_fix
+
+# ---------------------------------------------------------------------------
+# Branch B — escalate: assign Duo as REVIEWER, wait, then Claude fixes
+# using Duo's review notes as guidance.
+# ---------------------------------------------------------------------------
+
+duo-review:
+  extends: .auto_fix_base
+  stage: ai
+  needs: [classify-decision]
+  timeout: 25 minutes
+  variables:
+    GL_TOKEN: "$DUO_AUTO_FIX_PAT"
+    DUO_REVIEW_TIMEOUT: "900"
+    DUO_POLL_INTERVAL: "30"
+  # C3 fix: script-level skip (see claude-fix-auto comment)
+  script:
+    - |
+      if [ "${DECISION:-}" != "escalate" ]; then
+        echo "Skipping duo-review (DECISION='${DECISION:-unset}', expected 'escalate')"
+        exit 0
+      fi
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/assign-duo-reviewer.sh"
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/wait-for-duo-review.sh"
+
+claude-fix-with-guidance:
+  extends: .auto_fix_base
+  stage: ai
+  needs: [duo-review]
+  variables:
+    GL_TOKEN: "$DUO_AUTO_FIX_PAT"
+    CLAUDE_CODE_OAUTH_TOKEN: "$CLAUDE_CODE_OAUTH_TOKEN"
+  # C3 fix: script-level skip (see claude-fix-auto comment)
+  script:
+    - |
+      if [ "${DECISION:-}" != "escalate" ]; then
+        echo "Skipping claude-fix-with-guidance (DECISION='${DECISION:-unset}', expected 'escalate')"
+        exit 0
+      fi
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/claude-apply-fix.sh" with_guidance
+
+# ---------------------------------------------------------------------------
+# Convergence — safety guards & merge-gating chain.
+# Branch C (no_action) flows directly into resolve-threads via the optional
+# needs below, since neither claude-fix-auto nor claude-fix-with-guidance ran.
+# ---------------------------------------------------------------------------
+
+resolve-threads:
+  extends: .auto_fix_base
+  stage: ai
+  needs:
+    - job: classify-decision
+      artifacts: true
+    - job: claude-fix-auto
+      optional: true
+    - job: claude-fix-with-guidance
+      optional: true
+  allow_failure: false
+  # C3 fix: script-level skip for no_action branch
+  script:
+    - |
+      if [ "${DECISION:-}" = "no_action" ]; then
+        echo "Skipping resolve-threads (DECISION=no_action — nothing to resolve)"
+        exit 0
+      fi
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/resolve-threads.sh"
+
+check-forbidden:
+  extends: .auto_fix_base
+  stage: ai
+  needs:
+    - job: classify-decision
+      artifacts: true
+    - job: resolve-threads
+      optional: true
+  allow_failure: false
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/check-forbidden.sh"
+  artifacts:
+    paths:
+      - forbidden_files.txt
+    expire_in: 1 day
+    when: always
+
+check-loop-count:
+  extends: .auto_fix_base
+  stage: ai
+  needs: [check-forbidden]
+  allow_failure: false
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/check-loop-count.sh"
+
+wait-for-ci:
+  extends: .auto_fix_base
+  stage: ai
+  needs: [check-loop-count]
+  timeout: 20 minutes
+  allow_failure: false
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/wait-for-ci.sh"
+
+merge-check:
+  extends: .auto_fix_base
+  stage: ai
+  needs: [wait-for-ci]
+  allow_failure: false
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/merge-check.sh"
+
+merge-or-dryrun:
+  # If the merge call itself errors after all conditions passed we want it
+  # reported via handle-error rather than swallowed silently — keep
+  # allow_failure: false.
+  extends: .auto_fix_with_glab
+  stage: ai
+  needs: [merge-check]
+  allow_failure: false
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/merge-or-dryrun.sh"
+
+handle-error:
+  extends: .auto_fix_base
+  stage: ai
+  needs:
+    - job: claude-review
+      optional: true
+    - job: classify-decision
+      optional: true
+    - job: claude-fix-auto
+      optional: true
+    - job: duo-review
+      optional: true
+    - job: claude-fix-with-guidance
+      optional: true
+    - job: resolve-threads
+      optional: true
+    - job: check-forbidden
+      optional: true
+    - job: check-loop-count
+      optional: true
+    - job: wait-for-ci
+      optional: true
+    - job: merge-check
+      optional: true
+    - job: merge-or-dryrun
+      optional: true
+  when: on_failure
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-fix/handle-errors.sh"

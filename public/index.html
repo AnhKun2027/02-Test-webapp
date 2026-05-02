@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CheckCongViec Webapp</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 30px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+    }
+    h1 { margin-bottom: 10px; text-align: center; }
+    .subtitle { opacity: 0.8; text-align: center; margin-bottom: 30px; }
+
+    .status-grid {
+      display: grid;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 15px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 10px;
+    }
+    .status-icon {
+      font-size: 24px;
+      width: 40px;
+      text-align: center;
+    }
+    .status-text { flex: 1; }
+    .status-label { font-size: 12px; opacity: 0.7; }
+    .status-value { font-weight: bold; }
+
+    .realtime-test {
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .realtime-test h3 { margin-top: 0; }
+    #realtimeStatus {
+      padding: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+      min-height: 60px;
+    }
+    .connected { color: #4ade80; }
+    .disconnected { color: #f87171; }
+
+    button {
+      background: #4ade80;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    button:hover { background: #22c55e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 CheckCongViec Webapp</h1>
+    <p class="subtitle">Firebase Setup Complete</p>
+
+    <div class="status-grid">
+      <div class="status-item">
+        <span class="status-icon">🔥</span>
+        <div class="status-text">
+          <div class="status-label">Firebase Project</div>
+          <div class="status-value">checkcongviec-webapp</div>
+        </div>
+      </div>
+
+      <div class="status-item">
+        <span class="status-icon">🌐</span>
+        <div class="status-text">
+          <div class="status-label">Hosting URL</div>
+          <div class="status-value">checkcongviec-webapp.web.app</div>
+        </div>
+      </div>
+
+      <div class="status-item">
+        <span class="status-icon">📡</span>
+        <div class="status-text">
+          <div class="status-label">Realtime Database</div>
+          <div class="status-value" id="dbStatus">Connecting...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="realtime-test">
+      <h3>🧪 Realtime Database Test</h3>
+      <div id="realtimeStatus">Initializing Firebase...</div>
+      <button onclick="testWriteData()">Test Write Data</button>
+    </div>
+  </div>
+
+  <!-- Firebase Config (shared) -->
+  <script src="js/firebase-config.js"></script>
+
+  <!-- Firebase SDK (modular v9+) -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getDatabase, ref, set, onValue, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+    // Use shared Firebase config from firebase-config.js
+    const firebaseConfig = window.FIREBASE_CONFIG;
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    // Update status display
+    const statusEl = document.getElementById('realtimeStatus');
+    const dbStatusEl = document.getElementById('dbStatus');
+
+    // Test connection by listening to .info/connected
+    const connectedRef = ref(database, '.info/connected');
+    onValue(connectedRef, (snapshot) => {
+      if (snapshot.val() === true) {
+        dbStatusEl.textContent = 'Connected ✓';
+        dbStatusEl.className = 'status-value connected';
+        statusEl.innerHTML = '✅ Firebase Realtime Database connected!<br>Ready for real-time sync.';
+      } else {
+        dbStatusEl.textContent = 'Disconnected';
+        dbStatusEl.className = 'status-value disconnected';
+        statusEl.innerHTML = '⏳ Connecting to Firebase...';
+      }
+    });
+
+    // Listen for test data changes
+    const testRef = ref(database, 'test/connection');
+    onValue(testRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        statusEl.innerHTML += `<br><br>📝 Last test write:<br>- Time: ${data.timestamp || 'N/A'}<br>- Message: ${data.message || 'N/A'}`;
+      }
+    });
+
+    // Make testWriteData available globally
+    window.testWriteData = async function() {
+      try {
+        const testRef = ref(database, 'test/connection');
+        await set(testRef, {
+          message: 'Hello from CheckCongViec Webapp!',
+          timestamp: new Date().toLocaleString('vi-VN'),
+          userAgent: navigator.userAgent.substring(0, 50) + '...'
+        });
+        alert('✅ Data written successfully! Check Firebase Console.');
+      } catch (error) {
+        alert('❌ Error: ' + error.message);
+        console.error(error);
+      }
+    };
+
+    console.log('[Firebase] Initialized');
+  </script>
+</body>
+</html>

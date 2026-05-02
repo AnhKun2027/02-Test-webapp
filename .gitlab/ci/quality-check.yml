@@ -1,0 +1,40 @@
+# Reusable quality-check template
+# Mirrors: becky3/shared-workflows/.github/workflows/quality-check.yml@main
+#
+# Usage: extend .job_lint, .job_typecheck, .job_test, .job_markdownlint
+# as needed in the main .gitlab-ci.yml.
+
+.job_lint:
+  image: node:22
+  before_script:
+    - ${INSTALL_COMMAND:-npm install}
+  script:
+    - ${LINT_COMMAND}
+
+.job_typecheck:
+  image: node:22
+  before_script:
+    - ${INSTALL_COMMAND:-npm install}
+  script:
+    - ${TYPECHECK_COMMAND}
+
+.job_install_and_test:
+  image: node:22
+  script:
+    - ${INSTALL_COMMAND:-npm install}
+    - ${TEST_COMMAND:-npm test}
+  variables:
+    INSTALL_COMMAND: "npm install"
+    TEST_COMMAND: "npm test"
+
+.job_markdownlint:
+  image: node:22
+  script:
+    - npm install -g markdownlint-cli2
+    - |
+      if [ -n "${MARKDOWNLINT_GLOBS:-}" ]; then
+        # shellcheck disable=SC2086
+        markdownlint-cli2 $MARKDOWNLINT_GLOBS
+      else
+        markdownlint-cli2
+      fi

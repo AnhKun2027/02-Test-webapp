@@ -1,0 +1,37 @@
+# Self-CI: validate .gitlab/ scripts and CI configs
+# Mirrors .github/workflows/ci.yml from shared-workflows.
+
+.self_ci_base:
+  stage: lint
+  image: alpine:latest
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"'
+      changes:
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+
+shellcheck-scripts:
+  extends: .self_ci_base
+  before_script:
+    - apk add --no-cache shellcheck bash
+  script:
+    - |
+      EXIT_CODE=0
+      while IFS= read -r -d '' script; do
+        echo "Checking $script..."
+        shellcheck -x "$script" || EXIT_CODE=1
+      done < <(find .gitlab/scripts -name "*.sh" -print0)
+      exit $EXIT_CODE
+
+yamllint-ci:
+  extends: .self_ci_base
+  before_script:
+    - apk add --no-cache yamllint
+  script:
+    - |
+      yamllint -d "{extends: relaxed, rules: {line-length: {max: 160}}}" \
+        .gitlab-ci.yml .gitlab/ci/

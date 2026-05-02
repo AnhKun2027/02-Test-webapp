@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CheckCongViec - PDF Viewer</title>
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.1/css/bootstrap.min.css">
+
+  <!-- Main CSS (extracted from D-index_WebApp.html) -->
+  <link rel="stylesheet" href="css/main.css">
+
+  <!-- B1 Form CSS -->
+  <link rel="stylesheet" href="css/b1-form.css">
+  <!-- Chatbot CSS -->
+  <link rel="stylesheet" href="css/chatbot.css">
+
+  <!-- Google Fonts - Noto Sans for multilingual support (Vietnamese, Japanese) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap">
+
+  <!-- Sentry - Bắt lỗi JS runtime tự động -->
+  <script
+    src="https://js.sentry-cdn.com/2996f2212c15127767d4aaed5db9fa66.min.js"
+    crossorigin="anonymous"
+  ></script>
+</head>
+<body spellcheck="false">
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+  <div class="toolbar-inner">
+    <!-- Hamburger Menu Button -->
+    <div class="hamburger-menu" id="hamburgerMenu">
+      <button class="hamburger-btn" id="hamburgerBtn" title="Menu">&#9776;</button>
+    </div>
+
+    <!-- Nút Lưu tất cả & đồng bộ -->
+    <div id="saveAndSyncAllBtn" class="staging-files-btn" title="Lưu tất cả & đồng bộ" style="margin-left:8px;">
+      <div id="save-status-icon"></div>
+      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+    </div>
+
+    <!-- Nút Xoay trang -->
+    <div id="rotatePageBtn" class="staging-files-btn" title="Xoay trang" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/></svg>
+    </div>
+
+    <!-- Nút Text Overlay -->
+    <div id="stagingTextBtn" class="staging-files-btn" title="Thêm text overlay" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+    </div>
+
+    <!-- Nút Thêm ảnh overlay -->
+    <div id="stagingFilesBtn" class="staging-files-btn" title="Thêm ảnh overlay" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><rect x="2" y="5" width="14" height="14" rx="2"/><circle cx="6" cy="9" r="1.5"/><polyline points="16 16 11 11 2 16"/><path d="M16 5h4a2 2 0 0 1 2 2v4"/><line x1="19" y1="14" x2="19" y2="20"/><line x1="16" y1="17" x2="22" y2="17"/></svg>
+    </div>
+    <!-- Nút Chọn vùng -->
+    <div id="selectAreaBtn" class="staging-files-btn" title="Chọn vùng trên trang" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><circle cx="5" cy="17" r="2.5"/><circle cx="19" cy="17" r="2.5"/><path d="M7 17L19 4"/><path d="M17 17L5 4"/></svg>
+    </div>
+    <!-- Nút OCR & Translate -->
+    <div id="combinedAiBtn" class="staging-files-btn" title="Phân tích và dịch các vùng đã chọn bằng AI" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>
+    </div>
+    <!-- Hidden file input for local upload -->
+    <input type="file" id="localFileInput" accept=".pdf,image/*,.txt,text/plain,.zip,.rar,.7z" multiple style="display: none;">
+    <!-- Hidden file input for Check Finish (auto-tag "check") -->
+    <input type="file" id="checkFinishFileInput" accept=".pdf,image/*,.txt,text/plain,.zip,.rar,.7z" multiple style="display: none;">
+    <!-- Hidden file input cho overlay staging (chỉ nhận ảnh) -->
+    <input type="file" id="overlayFileInput" accept="image/*" multiple style="display: none;">
+
+    <!-- Spacer -->
+    <div class="flex-spacer"></div>
+
+    <!-- Core Tools -->
+
+    <!-- Slider -->
+    <div id="toolbarSlider" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
+      <input type="range" id="toolbarRange" min="10" max="250" value="100" style="-webkit-appearance:none;appearance:none;width:300px;height:2px;background:#e0dedd;border-radius:1px;outline:none;cursor:pointer;">
+      <span id="zoomLevel" style="font-size:13px;color:#aaa8a5;min-width:36px;text-align:right;flex-shrink:0;letter-spacing:0.01em;">100%</span>
+    </div>
+    <!-- Nút Vừa khít trang -->
+    <div id="fitToPageBtn" class="staging-files-btn" title="Vừa khít trang" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    </div>
+
+    <div id="toggleSelBoxesBtn" class="staging-files-btn" title="Ẩn/Hiện vùng chọn và overlay" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+    </div>
+    <div id="toggleVnOverlayBtn" class="staging-files-btn" title="Ẩn/Hiện bản dịch tiếng Việt" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="14" y2="12"/></svg>
+    </div>
+    <div id="showAllBtn" class="staging-files-btn" title="Hiện tất cả các vùng đã ẩn" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="3" y1="19" x2="11" y2="19"/><line x1="3" y1="22" x2="8" y2="22"/></svg>
+    </div>
+
+    <span class="tag-filter-label"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></span>
+    <select id="comboSelect" title="Chọn tổ hợp đã lưu">
+      <option value="">ALL</option>
+    </select>
+    <div id="toggleTagsBtn" class="staging-files-btn" title="Ẩn/Hiện tất cả tag" style="margin-left:4px;">
+      <svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+    </div>
+
+    <!-- Spacer -->
+    <div class="flex-spacer"></div>
+
+    <!-- Block 3: Cố định bên phải -->
+    <div class="toolbar-right-fixed">
+      <div id="toggleSidebarBtn" class="staging-files-btn" title="Ẩn/Hiện sidebar vùng chọn" style="margin-left:4px;">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="8" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="16" y2="21"/><rect x="8" y="3" width="8" height="18" fill="currentColor" opacity="0.12"/></svg>
+      </div>
+      <div id="toggleB1FormBtn" class="staging-files-btn" title="Ẩn/Hiện form phiên dịch" style="margin-left:4px;">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="14" y1="3" x2="14" y2="21"/><line x1="16" y1="8" x2="17.5" y2="8" stroke-width="1.5" opacity="0.5"/><line x1="19" y1="8" x2="21" y2="8" stroke-width="1.5"/><line x1="16" y1="11" x2="17.5" y2="11" stroke-width="1.5" opacity="0.5"/><line x1="19" y1="11" x2="21" y2="11" stroke-width="1.5"/><line x1="16" y1="14" x2="17.5" y2="14" stroke-width="1.5" opacity="0.5"/><line x1="19" y1="14" x2="21" y2="14" stroke-width="1.5"/><line x1="16" y1="17" x2="17.5" y2="17" stroke-width="1.5" opacity="0.5"/><line x1="19" y1="17" x2="20.5" y2="17" stroke-width="1.5"/></svg>
+      </div>
+
+      <!-- Employee Projects Bell -->
+      <div class="emp-projects-bell staging-files-btn" id="empProjectsBell" title="Công trình nhân viên">
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+        </svg>
+        <span class="emp-projects-badge" id="empProjectsBadge" style="display: none;">0</span>
+      </div>
+
+      <!-- Employee Projects Dropdown -->
+      <div class="emp-projects-dropdown" id="empProjectsDropdown">
+        <div class="emp-projects-header">
+          <span id="empProjectsTitle">Công trình</span>
+          <button class="emp-projects-close" id="empProjectsClose">&times;</button>
+        </div>
+        <div class="emp-projects-list" id="empProjectsList"></div>
+        <div class="emp-projects-footer" id="empProjectsFooter">Tổng: 0 công trình</div>
+      </div>
+
+      <!-- Presence (Online Users) -->
+      <div class="staging-files-btn" id="presenceBtn" title="Người dùng online" style="position:relative;cursor:pointer;">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span class="notification-badge" id="presenceBadge" style="display: none;">0</span>
+      </div>
+
+      <!-- Chatbot Toggle -->
+      <div class="staging-files-btn" id="chatbotToggleBtn" title="AI Chat" style="margin-left:4px;">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      </div>
+
+      <!-- Notification Bell -->
+      <div class="notification-bell staging-files-btn" id="notificationBell" title="Thông báo">
+        <svg viewBox="0 0 24 24">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <div class="main-container">
+    <!-- Pages Sidebar (Left) -->
+    <div class="pages-sidebar" id="pagesSidebar" style="display: none;">
+      <div id="thumbnailList"></div>
+    </div>
+
+    <!-- PDF Viewer Area (Center) -->
+    <div class="pdf-area">
+      <!-- Email Composer View (hidden by default) -->
+      <div class="email-composer-view" id="emailComposerView" style="display: none;">
+        <div class="email-composer-container">
+          <div class="email-composer-content">
+            <!-- TAB NAVIGATION (Left sidebar) -->
+            <div class="email-tabs-header">
+              <button class="email-tab-btn active" id="btn_tab_email_customer" data-tab="tab1" title="Email từ Khách Hàng">
+                <span class="tab-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6Z"/><path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/></svg></span>
+                <span class="tab-text">Email từ KH</span>
+              </button>
+              <button class="email-tab-btn" id="btn_tab_email_reply" data-tab="tab2" title="Phản Hồi khách hàng">
+                <span class="tab-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="tab-text">Phản Hồi</span>
+              </button>
+              <button class="email-tab-btn" id="btn_tab_email_submit" data-tab="tab3" title="Nộp Bài cho khách hàng">
+                <span class="tab-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                <span class="tab-text">Nộp Bài</span>
+              </button>
+              <!-- Tab 4: AI Type selector (vừa là tab vừa là select) -->
+              <div class="email-ai-type-wrapper" id="btn_tab_email_ai" data-tab="tab4" tabindex="0">
+                <span class="tab-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.288L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.288Z"/></svg></span>
+                <select class="form-control form-control-sm" id="email_ai_type" title="Chọn loại email để soạn thủ công&#10;&#10;• Bao Gia — Báo giá cho khách&#10;• Hen Tre — Xin hẹn trễ deadline&#10;• Hoan Thanh - Ket Thuc — Xác nhận hoàn thành theo phản hồi OK của khách&#10;• Hoi Khach — Hỏi lại khách những chỗ chưa rõ&#10;• Other — Nội dung khác">
+                  <option value="" disabled selected>AI Type</option>
+                  <option value="Bao Gia" hidden>Bao Gia</option>
+                  <option value="Hen Tre">Hen Tre</option>
+                  <option value="Hoan Thanh - Ket Thuc" hidden>Hoan Thanh - Ket Thuc</option>
+                  <option value="Hoi Khach">Hoi Khach</option>
+                  <option value="Other" hidden>Other</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- TAB CONTENT (Main content area) -->
+            <div class="email-tabs-content">
+              <!-- TAB 1: Email từ khách hàng -->
+              <div class="email-tab-pane gmail-compose active" id="tab1">
+                <div class="email-subject-bar" data-tab-key="email_customer">
+                  <div class="email-subject-field">
+                    <span class="email-subject-label">件名 :</span>
+                    <input type="text" id="subject_email_customer_jp" class="email-subject-input" data-tab-key="email_customer" placeholder="メールの件名...">
+                  </div>
+                  <div class="email-subject-field">
+                    <span class="email-subject-label">Tiêu đề :</span>
+                    <input type="text" id="subject_email_customer_vn" class="email-subject-input" data-tab-key="email_customer" placeholder="Tiêu đề tiếng Việt...">
+                  </div>
+                </div>
+                <div class="gmail-compose-body">
+                  <div class="sbs-col sbs-jp">
+                    <div class="textarea-btn-wrapper">
+                      <textarea class="sbs-textarea-readonly sbs-textarea" id="email_customer_jp" data-tab-key="email_customer" readonly placeholder="Email từ khách hàng (JP)..."></textarea>
+                      <button id="translate_email_customer" class="lang-btn-overlay" data-action="translate-vn" data-base="email_customer" data-tab-key="email_customer" title="Dịch JP → VN"><span>🇯🇵</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span>🇻🇳</span></button>
+                    </div>
+                  </div>
+                  <div class="sbs-col sbs-vn">
+                    <textarea class="sbs-textarea-readonly sbs-textarea" id="email_customer_vn" data-tab-key="email_customer" readonly placeholder="Bản dịch tiếng Việt..."></textarea>
+                  </div>
+                </div>
+                <div id="attachments_email_customer" class="gmail-attachments-area" data-tab-key="email_customer" style="display:none">
+                  <div class="gmail-image-preview-container">
+                    <div class="empty-state">Chưa có hình ảnh đính kèm</div>
+                  </div>
+                </div>
+                <div class="gmail-bottom-bar">
+                  <button type="button" id="btn_email_customer" class="gmail-send-btn" data-action="save-send" data-tab-key="email_customer" style="display:none">Send</button>
+                  <div class="gmail-bottom-tools">
+                    <button type="button" id="attach_email_customer" class="gmail-icon-btn" data-action="upload-image" data-tab-key="email_customer" title="Đính kèm ảnh" style="display:none">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                    </button>
+                    <label class="gmail-cc-inline" title="CC" style="display:none">
+                      <span>CC :</span>
+                      <input type="email" id="cc_email_customer" class="gmail-cc-input" data-field="cc" data-tab-key="email_customer" placeholder="email@example.com">
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- TAB 2: Phản hồi -->
+              <div class="email-tab-pane gmail-compose" id="tab2">
+                <div class="email-subject-bar" data-tab-key="email_reply">
+                  <div class="email-subject-field">
+                    <span class="email-subject-label">件名 :</span>
+                    <input type="text" id="subject_email_reply_jp" class="email-subject-input" data-tab-key="email_reply" placeholder="メールの件名...">
+                  </div>
+                  <div class="email-subject-field">
+                    <span class="email-subject-label">Tiêu đề :</span>
+                    <input type="text" id="subject_email_reply_vn" class="email-subject-input" data-tab-key="email_reply" placeholder="Tiêu đề tiếng Việt...">
+                  </div>
+                </div>
+                <div class="gmail-compose-body">
+                  <div class="sbs-col sbs-jp">
+                    <div class="textarea-btn-wrapper">
+                      <textarea class="sbs-textarea-readonly sbs-textarea" id="email_reply_jp" data-tab-key="email_reply" readonly placeholder="Nhập nội dung email phản hồi (JP)..."></textarea>
+                      <button id="translate_email_reply" class="lang-btn-overlay" data-action="translate-vn" data-base="email_reply" data-tab-key="email_reply" title="Dịch JP → VN"><span>🇯🇵</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span>🇻🇳</span></button>
+                    </div>
+                  </div>
+                  <div class="sbs-col sbs-vn">
+                    <div class="textarea-btn-wrapper">
+                      <textarea class="sbs-textarea-readonly sbs-textarea" id="email_reply_vn" data-tab-key="email_reply" readonly placeholder="Bản dịch tiếng Việt..."></textarea>
+                      <button id="editjp_email_reply" class="lang-btn-overlay lang-btn-overlay--jp" data-action="apply-instructions" data-base="email_reply" data-tab-key="email_reply" title="Áp dụng // instructions vào JP"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg><span>Sửa JP</span></button>
+                    </div>
+                  </div>
+                </div>
+                <div id="attachments_email_reply" class="gmail-attachments-area" data-tab-key="email_reply">
+                  <div class="gmail-image-preview-container">
+                    <div class="empty-state">Chưa có hình ảnh đính kèm</div>
+                  </div>
+                </div>
+                <div class="gmail-bottom-bar">
+                  <button type="button" id="btn_email_reply" class="gmail-send-btn" data-action="save-send" data-tab-key="email_reply">Reply</button>
+                  <div class="gmail-bottom-tools">
+                    <button type="button" id="attach_email_reply" class="gmail-icon-btn" data-action="upload-image" data-tab-key="email_reply" title="Đính kèm ảnh">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                    </button>
+                    <label class="gmail-cc-inline" title="CC">
+                      <span>CC :</span>
+                      <input type="email" id="cc_email_reply" class="gmail-cc-input" data-field="cc" data-tab-key="email_reply" placeholder="email@example.com">
+                    </label>
+                    <label class="gmail-cc-inline gmail-msgid-inline" title="Message ID">
+                      <span>MsgID :</span>
+                      <input type="text" id="msgid_email_reply" class="gmail-cc-input gmail-msgid-input" data-field="msgid" data-tab-key="email_reply" placeholder="" readonly>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- TAB 3: Nộp bài -->
+              <div class="email-tab-pane gmail-compose" id="tab3">
+                <div class="email-subject-bar" data-tab-key="email_send">
+                  <div class="email-subject-field">
+                    <span class="email-subject-label">件名 :</span>
+                    <input type="text" id="subject_email_send_jp" class="email-subject-input" data-tab-key="email_send" placeholder="メールの件名...">
+                  </div>
+                  <div class="email-subject-field">
+                    <span class="email-subject-label">Tiêu đề :</span>
+                    <input type="text" id="subject_email_send_vn" class="email-subject-input" data-tab-key="email_send" placeholder="Tiêu đề tiếng Việt...">
+                  </div>
+                </div>
+                <div class="gmail-compose-body">
+                  <div class="sbs-col sbs-jp">
+                    <div class="textarea-btn-wrapper">
+                      <textarea class="sbs-textarea-readonly sbs-textarea" id="email_send_jp" data-tab-key="email_send" readonly placeholder="Nhập nội dung email nộp bài (JP)..."></textarea>
+                      <button id="translate_email_send" class="lang-btn-overlay" data-action="translate-vn" data-base="email_send" data-tab-key="email_send" title="Dịch JP → VN"><span>🇯🇵</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span>🇻🇳</span></button>
+                    </div>
+                  </div>
+                  <div class="sbs-col sbs-vn">
+                    <div class="textarea-btn-wrapper">
+                      <textarea class="sbs-textarea-readonly sbs-textarea" id="email_send_vn" data-tab-key="email_send" readonly placeholder="Bản dịch tiếng Việt..."></textarea>
+                      <button id="editjp_email_send" class="lang-btn-overlay lang-btn-overlay--jp" data-action="apply-instructions" data-base="email_send" data-tab-key="email_send" title="Áp dụng // instructions vào JP"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg><span>Sửa JP</span></button>
+                    </div>
+                  </div>
+                </div>
+                <div id="attachments_email_send" class="gmail-attachments-area" data-tab-key="email_send">
+                  <div class="gmail-image-preview-container">
+                    <div class="empty-state">Chưa có hình ảnh đính kèm</div>
+                  </div>
+                </div>
+                <div class="gmail-bottom-bar">
+                  <button type="button" id="btn_email_send" class="gmail-send-btn" data-action="save-send" data-tab-key="email_send">Submit</button>
+                  <div class="gmail-bottom-tools">
+                    <button type="button" id="attach_email_send" class="gmail-icon-btn" data-action="upload-image" data-tab-key="email_send" title="Đính kèm ảnh">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                    </button>
+                    <label class="gmail-cc-inline" title="CC">
+                      <span>CC :</span>
+                      <input type="email" id="cc_email_send" class="gmail-cc-input" data-field="cc" data-tab-key="email_send" placeholder="email@example.com">
+                    </label>
+                    <label class="gmail-cc-inline gmail-msgid-inline" title="Message ID">
+                      <span>MsgID :</span>
+                      <input type="text" id="msgid_email_send" class="gmail-cc-input gmail-msgid-input" data-field="msgid" data-tab-key="email_send" placeholder="" readonly>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- TAB 4: AI Email Type -->
+              <div class="email-tab-pane gmail-compose" id="tab4">
+                <div class="email-subject-bar" data-tab-key="email_ai">
+                  <div class="email-subject-field">
+                    <span class="email-subject-label">件名 :</span>
+                    <input type="text" id="subject_email_ai_jp" class="email-subject-input" data-tab-key="email_ai" placeholder="メールの件名...">
+                  </div>
+                  <div class="email-subject-field">
+                    <span class="email-subject-label">Tiêu đề :</span>
+                    <input type="text" id="subject_email_ai_vn" class="email-subject-input" data-tab-key="email_ai" placeholder="Tiêu đề tiếng Việt...">
+                  </div>
+                </div>
+                <div class="gmail-compose-body">
+                  <div class="sbs-col sbs-jp">
+                    <div class="textarea-btn-wrapper">
+                      <textarea class="sbs-textarea" id="email_ai_jp" data-tab-key="email_ai" placeholder="Nội dung email AI (JP)..."></textarea>
+                      <button id="translate_email_ai" class="lang-btn-overlay" data-action="translate-vn" data-base="email_ai" data-tab-key="email_ai" title="Dịch JP → VN"><span>🇯🇵</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span>🇻🇳</span></button>
+                    </div>
+                  </div>
+                  <div class="sbs-col sbs-vn">
+                    <div class="textarea-btn-wrapper">
+                      <textarea class="sbs-textarea" id="email_ai_vn" data-tab-key="email_ai" placeholder="Bản dịch tiếng Việt..."></textarea>
+                      <button id="editjp_email_ai" class="lang-btn-overlay lang-btn-overlay--jp" data-action="apply-instructions" data-base="email_ai" data-tab-key="email_ai" title="Áp dụng // instructions vào JP"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg><span>Sửa JP</span></button>
+                    </div>
+                  </div>
+                </div>
+                <div id="attachments_email_ai" class="gmail-attachments-area" data-tab-key="email_ai">
+                  <div class="gmail-image-preview-container">
+                    <div class="empty-state">Chưa có hình ảnh đính kèm</div>
+                  </div>
+                </div>
+                <div class="gmail-bottom-bar">
+                  <button type="button" id="btn_email_ai" class="gmail-send-btn gmail-send-btn--outline" data-action="save-send" data-tab-key="email_ai">Send</button>
+                  <div class="gmail-bottom-tools">
+                    <button type="button" id="attach_email_ai" class="gmail-icon-btn" data-action="upload-image" data-tab-key="email_ai" title="Đính kèm ảnh">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                    </button>
+                    <label class="gmail-cc-inline" title="CC">
+                      <span>CC :</span>
+                      <input type="email" id="cc_email_ai" class="gmail-cc-input" data-field="cc" data-tab-key="email_ai" placeholder="email@example.com">
+                    </label>
+                    <label class="gmail-cc-inline gmail-msgid-inline" title="Message ID">
+                      <span>MsgID :</span>
+                      <input type="text" id="msgid_email_ai" class="gmail-cc-input gmail-msgid-input" data-field="msgid" data-tab-key="email_ai" placeholder="" readonly>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PDF Wrapper -->
+      <div class="pdf-wrapper" id="pdfWrapper" style="display: none;">
+        <canvas id="pdfCanvas"></canvas>
+        <div class="selection-overlay" id="selectionOverlay"></div>
+      </div>
+    </div>
+
+    <!-- Selection Sidebar (Right) -->
+    <div class="sidebar">
+      <!-- Pane 1: Vùng chọn (mặc định) -->
+      <div id="sidebarSelectionsPane">
+        <div class="selection-count-header">
+          <div id="selectionCount">0 vùng</div>
+        </div>
+        <div class="selection-search-wrapper">
+          <input type="text" id="selectionSearch" class="selection-search-input" placeholder="Tìm kiếm vùng chọn...">
+          <button type="button" id="selectionSearchClear" class="selection-search-clear" style="display:none;">&times;</button>
+        </div>
+        <div id="selectionList"></div>
+      </div>
+      <!-- Pane 2: Chatbot (ẩn, toggle qua nút chat) -->
+      <div class="chatbot-sidebar-pane" id="sidebarChatPane">
+        <div class="chatbot-sidebar-header">
+          <span>AI Chat</span>
+          <button class="chatbot-header-btn" id="chatbotClearBtn" title="Xóa lịch sử">🗑</button>
+        </div>
+        <div class="chatbot-messages" id="chatbotMessages"></div>
+        <div class="chatbot-input-area">
+          <input class="chatbot-input" id="chatbotInput" placeholder="Nhập câu hỏi..." autocomplete="off">
+          <button class="chatbot-send-btn" id="chatbotSendBtn">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- B1 Form Sidebar -->
+    <div class="sidebar-b1-form" id="sidebarB1Form">
+      <div id="b1FormContainer">
+        <!-- B1 Form will be loaded here -->
+        <div class="text-center p-3">
+          <div class="spinner-border text-primary" role="status">
+            <span class="sr-only">Loading...</span>
+          </div>
+          <p class="mt-2">Loading form...</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- File Manager (Bottom) -->
+  <div class="file-manager-horizontal" id="fileManagerHorizontal">
+    <div class="send-gmail-btn-fixed" id="emailComposerFixed" title="Soạn Email"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#777777" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></div>
+    <div class="file-list-horizontal" id="fileListHorizontal"></div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <div id="loadingText">Đang xử lý...</div>
+    </div>
+  </div>
+
+  <!-- File Context Menu (right-click) -->
+  <div class="file-context-menu" id="fileContextMenu">
+    <div class="context-menu-item extract" id="contextMenuExtract" style="display: none;">
+      <span class="context-menu-icon">📂</span>
+      <span>Giải nén file</span>
+    </div>
+    <div class="context-menu-item delete" id="contextMenuDelete">
+      <span class="context-menu-icon">🗑️</span>
+      <span>Xóa file</span>
+    </div>
+  </div>
+
+  <!-- Status Bar (Firebase Status + Online Users) -->
+  <div id="statusBar">
+    <span id="firebaseStatus">🔄</span>
+  </div>
+
+  <!-- JS Libraries -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.1/js/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <!-- Firebase Config (shared with index.html) -->
+  <script type="module" src="js/firebase-config.js"></script>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getDatabase, ref, set, onValue, push, remove, onDisconnect, get, update, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+    import { getStorage, ref as storageRef, uploadBytes, uploadString, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+    import { getAuth, signInWithPopup, signOut, onAuthStateChanged, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+    // Use shared Firebase config from firebase-config.js
+    const firebaseConfig = window.FIREBASE_CONFIG;
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const storage = getStorage(app);
+
+    // Storage for custom bucket "checkcongviec" (shared with Cloud Run)
+    // All files will be stored in: gs://checkcongviec/{sessionId}/{filename}
+    const storageCheckcongviec = getStorage(app, "gs://checkcongviec");
+
+    // Make Firebase available globally
+    window.firebaseApp = app;
+    window.firebaseDb = database;
+    window.firebaseStorage = storage;
+    window.firebaseStorageCheckcongviec = storageCheckcongviec;  // Custom bucket for all files
+    window.firebaseRef = ref;
+    window.firebaseSet = set;
+    window.firebaseOnValue = onValue;
+    window.firebasePush = push;
+    window.firebaseRemove = remove;
+    window.firebaseOnDisconnect = onDisconnect;
+    window.firebaseGet = get;
+    window.firebaseUpdate = update;
+    window.firebaseServerTimestamp = serverTimestamp;
+    // Storage functions
+    window.firebaseStorageRef = storageRef;
+    window.firebaseUploadBytes = uploadBytes;
+    window.firebaseUploadString = uploadString;
+    window.firebaseGetDownloadURL = getDownloadURL;
+    window.firebaseDeleteObject = deleteObject;
+
+    // ==================== Firebase Authentication ====================
+    const auth = getAuth(app);
+    const googleProvider = new GoogleAuthProvider();
+
+    // Restrict to specific domain (Google Workspace)
+    // This hints Google to show only accounts from this domain
+    googleProvider.setCustomParameters({
+      hd: 'futagobim.com'  // Hosted domain - only show @futagobim.com accounts
+    });
+
+    // Make Auth available globally
+    window.firebaseAuth = auth;
+    window.firebaseCurrentUser = null;
+
+    // UI Elements
+    const signInBtn = document.getElementById('googleSignInBtn');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const userEmailSpan = document.getElementById('userEmail');
+
+    // Auth State Observer
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is signed in
+        console.log('[Auth] Signed in as:', user.email);
+        window.firebaseCurrentUser = user;
+
+        // Check domain restriction
+        const email = user.email || '';
+        const allowedDomains = ['photopm.com', 'futagobim.com'];
+        const userDomain = email.split('@')[1];
+
+        if (allowedDomains.includes(userDomain)) {
+          // Valid domain - show user info
+          signInBtn.style.display = 'none';
+          userEmailSpan.textContent = email;
+          userEmailSpan.style.display = 'inline';
+          signOutBtn.style.display = 'inline-block';
+
+          // Update hamburger avatar with first letter
+          const avatar = document.getElementById('hamburgerAvatar');
+          if (avatar) avatar.textContent = email.charAt(0).toUpperCase();
+
+          console.log('[Auth] User authorized:', email);
+        } else {
+          // Invalid domain - sign out
+          console.warn('[Auth] Domain not allowed:', userDomain);
+          alert('Chỉ chấp nhận email @photopm.com hoặc @futagobim.com');
+          signOut(auth);
+        }
+      } else {
+        // User is signed out
+        console.log('[Auth] User signed out');
+        window.firebaseCurrentUser = null;
+        signInBtn.style.display = 'inline-block';
+        userEmailSpan.style.display = 'none';
+        signOutBtn.style.display = 'none';
+
+        // Reset hamburger avatar
+        const avatar = document.getElementById('hamburgerAvatar');
+        if (avatar) avatar.textContent = '?';
+      }
+    });
+
+    // Sign In Button Handler
+    signInBtn?.addEventListener('click', async () => {
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        console.log('[Auth] Sign in successful:', result.user.email);
+      } catch (error) {
+        console.error('[Auth] Sign in error:', error);
+        if (error.code === 'auth/popup-closed-by-user') {
+          // User closed popup - do nothing
+        } else if (error.code === 'auth/cancelled-popup-request') {
+          // Multiple popups - do nothing
+        } else {
+          alert('Đăng nhập thất bại: ' + error.message);
+        }
+      }
+    });
+
+    // Sign Out Button Handler
+    signOutBtn?.addEventListener('click', async () => {
+      try {
+        await signOut(auth);
+        console.log('[Auth] Signed out successfully');
+      } catch (error) {
+        console.error('[Auth] Sign out error:', error);
+      }
+    });
+
+    // Export auth functions
+    window.firebaseSignInWithGoogle = () => signInWithPopup(auth, googleProvider);
+    window.firebaseSignOut = () => signOut(auth);
+
+    /**
+     * Fetch from Firebase Storage with Auth token
+     * Automatically adds Authorization header if user is signed in
+     * @param {string} url - The Storage URL to fetch
+     * @param {object} options - Additional fetch options
+     * @returns {Promise<Response>}
+     */
+    window.firebaseAuthFetch = async (url, options = {}) => {
+      const user = auth.currentUser;
+      if (user) {
+        // Get fresh ID token
+        const token = await user.getIdToken();
+        options.headers = {
+          ...options.headers,
+          'Authorization': `Bearer ${token}`
+        };
+      }
+      return fetch(url, options);
+    };
+
+    // Track Firebase connection status
+    window.firebaseConnected = false;
+
+    // Update Firebase status indicator
+    // 3 states: Disconnected (red), Connecting (yellow), Ready (green)
+    window.updateFirebaseStatus = function() {
+      const statusEl = document.getElementById('firebaseStatus');
+      if (!statusEl) return;
+
+      if (!window.firebaseConnected) {
+        statusEl.innerHTML = '🔴';
+      } else if (!window.FirebaseSync?.sessionId) {
+        statusEl.innerHTML = '🟡';
+      } else {
+        statusEl.innerHTML = '🟢';
+      }
+    };
+
+    // Listen for Firebase connection changes
+    const connectedRef = ref(database, '.info/connected');
+    onValue(connectedRef, (snapshot) => {
+      window.firebaseConnected = snapshot.val() === true;
+      window.updateFirebaseStatus();
+    });
+
+    console.log('[Firebase] Initialized');
+  </script>
+
+  <!-- Presence Dropdown Portal (fixed position, outside toolbar to avoid overflow clip) -->
+  <div id="presenceDropdown" style="display:none;position:fixed;right:120px;top:42px;width:200px;max-height:300px;background:rgba(8,12,24,0.92);backdrop-filter:blur(20px);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:9999;font-size:13px;color:#e2e8f0;overflow:auto;padding:8px 0;flex-direction:column;"></div>
+
+  <!-- Notification Dropdown Portal (fixed position, outside toolbar to avoid overflow clip) -->
+  <div class="notification-dropdown" id="notificationDropdown">
+    <div class="notification-header">
+      <span class="notification-title">Thông báo</span>
+      <span class="notification-mark-read" id="notifMarkAllRead">✓ Đọc tất cả</span>
+      <span class="notification-delete-read" id="notifDeleteRead">🗑 Xóa đã đọc</span>
+    </div>
+    <div class="notification-list" id="notificationList">
+      <div class="notification-empty">Không có thông báo</div>
+    </div>
+  </div>
+
+  <!-- Hamburger Dropdown Portal (fixed position, outside toolbar to avoid overflow clip) -->
+  <div class="hamburger-dropdown" id="hamburgerDropdown">
+    <!-- ACCOUNT -->
+    <div class="hamburger-section-label">ACCOUNT</div>
+    <div class="hamburger-account-row">
+      <div class="hamburger-avatar" id="hamburgerAvatar">?</div>
+      <div class="hamburger-account-info">
+        <span id="userEmail" style="display: none;"></span>
+        <div class="hamburger-account-sub">Google Account</div>
+      </div>
+      <div id="authContainer" class="auth-container">
+        <button class="btn btn-google-signin" id="googleSignInBtn" title="Đăng nhập với Google (@futagobim.com)" style="display: none;">Sign in</button>
+        <button class="btn" id="signOutBtn" title="Đăng xuất" style="display: none;">Sign out</button>
+      </div>
+    </div>
+    <div class="hamburger-divider"></div>
+    <!-- SESSION -->
+    <div class="hamburger-section-label">SESSION</div>
+    <div class="hamburger-session-row" style="display:flex;align-items:center;gap:6px;">
+      <label for="sessionId" class="hamburger-session-label">Session:</label>
+      <input type="text" id="sessionId" placeholder="messageId"
+             class="hamburger-session-input" style="flex:1;">
+      <button id="sessionLoadBtn" style="padding:2px 10px;font-size:12px;cursor:pointer;border:1px solid #555;border-radius:4px;background:#333;color:#fff;" title="Load session mới">Load</button>
+    </div>
+    <div class="hamburger-divider"></div>
+    <!-- FILE -->
+    <div class="hamburger-section-label">FILE</div>
+    <div class="hamburger-menu-item" id="uploadLocalBtnBottom" title="Tải thêm file PDF/ảnh/TXT/ZIP/RAR từ máy tính">
+      <span>&#128193;</span> Add Local File
+    </div>
+    <div class="hamburger-menu-item" id="checkFinishBtn" title="Thêm file để nhân viên check hoàn thành công việc">
+      <span>&#9989;</span> Check Finish
+    </div>
+    <div class="hamburger-divider"></div>
+    <!-- ADD ROW -->
+    <div class="hamburger-section-label">ADD ROW</div>
+    <div class="hamburger-session-row" style="padding: 6px 16px; display: flex; align-items: center; gap: 8px;">
+      <label class="hamburger-session-label" style="white-space: nowrap;">Rows:</label>
+      <select id="rowCountInput" class="row-count-input" title="Số dòng cần thêm vào Sheet" style="width: 60px; font-size: 16px; margin-left: 12px;">
+        <option value="">-</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+      </select>
+    </div>
+    <div class="hamburger-divider"></div>
+    <div class="hamburger-divider"></div>
+    <!-- AI MODEL -->
+    <div class="hamburger-section-label">AI MODEL</div>
+    <div style="padding: 6px 16px;">
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="width:80px;font-size:11px;color:#9ca3af;">Translate:</label>
+          <input type="text" id="aiModelTranslate" class="hamburger-session-input" style="flex:1;font-size:12px;" placeholder="gemini-2.5-flash">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="width:80px;font-size:11px;color:#9ca3af;">Classifier:</label>
+          <input type="text" id="aiModelClassifier" class="hamburger-session-input" style="flex:1;font-size:12px;" placeholder="gemini-2.5-pro">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="width:80px;font-size:11px;color:#9ca3af;">OCR+Dịch:</label>
+          <input type="text" id="aiModelCombinedAi" class="hamburger-session-input" style="flex:1;font-size:12px;" placeholder="gemini-2.5-pro">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="width:80px;font-size:11px;color:#9ca3af;">Chatbot:</label>
+          <input type="text" id="aiModelChatbot" class="hamburger-session-input" style="flex:1;font-size:12px;" placeholder="gemini-2.5-flash">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+        <button id="aiModelSaveBtn" style="padding:3px 14px;font-size:12px;cursor:pointer;border:1px solid #28a745;border-radius:4px;background:#28a745;color:#fff;" title="Lưu AI model config">Save Model</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Configuration -->
+  <script type="module">
+    // PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // Google Apps Script Web App URL (backend API) - for form data only
+    window.APPS_SCRIPT_API_URL = 'https://script.google.com/macros/s/AKfycbzJ226Abe_n2E6h51Bz1kgayeeGmdtjPEYjqUVeoweb4NuC96PE-7qlZnbi5IL9bZ_gqA/exec';
+
+    // Cloud Storage bucket (files are synced here by Gmail Sync)
+    window.CLOUD_STORAGE_BUCKET = 'checkcongviec';
+
+    // Get URL parameters - now only messageId is required
+    const urlParams = new URLSearchParams(window.location.search);
+    const messageId = urlParams.get('messageId') || '';
+
+    // Set session ID from URL
+    document.getElementById('sessionId').value = messageId;
+
+    console.log('[App] Session ID (messageId):', messageId);
+
+    // Load session button — navigate tới URL mới với messageId
+    document.getElementById('sessionLoadBtn')?.addEventListener('click', () => {
+      const newId = document.getElementById('sessionId').value.trim();
+      if (newId) {
+        window.location.href = '/app?messageId=' + encodeURIComponent(newId);
+      }
+    });
+    // Enter trong ô session cũng load
+    document.getElementById('sessionId')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('sessionLoadBtn')?.click();
+      }
+    });
+  </script>
+
+  <!-- Main App JavaScript (ES Modules) -->
+  <!-- Load order matters: dependencies first -->
+  <script type="module" src="js/api-client.js"></script>
+  <script type="module" src="js/core-utils.js"></script>
+  <script type="module" src="js/electron/file-server.js"></script>
+  <script type="module" src="js/firebase-sync/index.js"></script>
+  <script type="module" src="js/tag-system/index.js"></script>
+  <script type="module" src="js/pdf-viewer/index.js"></script>
+  <script type="module" src="js/capture-functions.js"></script>
+  <script type="module" src="js/selection-manager/index.js"></script>
+  <script type="module" src="js/file-manager/index.js"></script>
+  <script type="module" src="js/overlay-system/index.js"></script>
+  <script type="module" src="js/page-utils.js"></script>
+  <script type="module" src="js/ai/ai-processing.js"></script>
+  <script type="module" src="js/email-composer/index.js"></script>
+  <script type="module" src="js/email-templates/index.js"></script>
+  <script type="module" src="js/b1-form/b1-form-workflow.js"></script>
+  <script type="module" src="js/b1-form/index.js"></script>
+  <script type="module" src="js/notification-system.js"></script>
+  <script type="module" src="js/employee-projects.js"></script>
+  <script type="module" src="js/ai/chatbot.js"></script>
+  <script type="module" src="js/app/app-text-editor.js"></script>
+  <script type="module" src="js/app/index.js"></script>
+
+
+</body>
+</html>

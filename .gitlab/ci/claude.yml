@@ -1,0 +1,102 @@
+# Claude Code — Reusable template
+# Mirrors: .github/workflows/claude.yml (anthropics/claude-code-action)
+# Doc:     https://code.claude.com/docs/en/gitlab-ci-cd
+#
+# Auth: CLAUDE_CODE_OAUTH_TOKEN (masked CI variable) — uses Claude Max plan
+# quota, NOT pay-per-token Anthropic API billing. Generate via:
+#   claude setup-token   (run locally first)
+# then store the token in Settings -> CI/CD -> Variables.
+#
+# Optional: GITLAB_TOKEN (api scope) so Claude can push branches and open MRs
+# via glab. Falls back to CI_JOB_TOKEN (read-only on most operations) if not set.
+#
+# Triggers (configured in .gitlab-ci.yml):
+#   - web         (manual run from CI/CD -> Pipelines)
+#   - merge_request_event with when:manual (play button on MR pipeline)
+# A webhook listener for `@claude` mention triggers is NOT included — that
+# would require an external service that calls the pipeline trigger API
+# and passes AI_FLOW_INPUT/CONTEXT/EVENT.
+
+.job_claude:
+  image: node:22-slim
+  variables:
+    GIT_STRATEGY: fetch
+    # Bot identity (parameterizable, đối ứng GitHub bot_name / bot_id)
+    BOT_NAME: "${BOT_NAME:-claude-bot}"
+    BOT_DISPLAY_NAME: "${BOT_DISPLAY_NAME:-Claude Code}"
+    # Comma-separated whitelist of GitLab usernames allowed to trigger this job.
+    # Đối ứng GitHub: github.actor == inputs.allowed_user.
+    # Set qua Settings -> CI/CD -> Variables (vd: "an145,AnhKun2027").
+    ALLOWED_USERS: "${ALLOWED_USERS:-an145,AnhKun2027}"
+    GIT_AUTHOR_NAME: "${BOT_DISPLAY_NAME:-Claude Code}"
+    GIT_AUTHOR_EMAIL: "claude-code@users.noreply.gitlab.com"
+    GIT_COMMITTER_NAME: "${BOT_DISPLAY_NAME:-Claude Code}"
+    GIT_COMMITTER_EMAIL: "claude-code@users.noreply.gitlab.com"
+  before_script:
+    # ---------------------------------------------------------------------
+    # Pre-check: chỉ ALLOWED_USERS mới được trigger job này
+    # GitLab cung cấp GITLAB_USER_LOGIN cho mọi pipeline source
+    # (web/manual/schedule/api). Schedule pipeline -> user là owner schedule.
+    # Fallback: lấy từ CI_COMMIT_AUTHOR ("Name <email>") nếu thiếu.
+    # ---------------------------------------------------------------------
+    - |
+      TRIGGERING_USER="${GITLAB_USER_LOGIN:-${CI_COMMIT_AUTHOR%% *}}"
+      if [ -z "$TRIGGERING_USER" ]; then
+        echo "ERROR: Cannot determine triggering user (GITLAB_USER_LOGIN/CI_COMMIT_AUTHOR both empty)"
+        exit 1
+      fi
+      if ! echo ",${ALLOWED_USERS}," | grep -q ",${TRIGGERING_USER},"; then
+        echo "ERROR: User '$TRIGGERING_USER' not in ALLOWED_USERS list"
+        echo "       Set ALLOWED_USERS in Settings -> CI/CD -> Variables to authorize."
+        exit 1
+      fi
+      echo "User '$TRIGGERING_USER' authorized (ALLOWED_USERS gate passed)"
+    - apt-get update --quiet && apt-get install --yes curl git ca-certificates gnupg jq && rm -rf /var/lib/apt/lists/*
+    - npm install -g @anthropic-ai/claude-code
+    # Install glab so Claude can interact with merge requests / issues
+    - GLAB_VERSION=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases" | jq -r '.[0].tag_name')
+    - curl -sLo /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/${GLAB_VERSION}/downloads/glab_${GLAB_VERSION#v}_linux_amd64.tar.gz" && tar -xzf /tmp/glab.tar.gz -C /tmp && mv /tmp/bin/glab /usr/local/bin/glab && chmod +x /usr/local/bin/glab
+    - git config --global user.name "$GIT_AUTHOR_NAME"
+    - git config --global user.email "$GIT_AUTHOR_EMAIL"
+    # Authenticate glab + git remote so Claude can push and open MRs
+    - |
+      AUTH_TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
+      mkdir -p ~/.config/glab-cli
+      cat > ~/.config/glab-cli/config.yml <<EOF
+      hosts:
+        ${CI_SERVER_HOST}:
+          token: ${AUTH_TOKEN}
+          api_host: ${CI_SERVER_HOST}
+          user: ${BOT_NAME}
+      check_update: "false"
+      git_protocol: https
+      EOF
+      chmod 600 ~/.config/glab-cli/config.yml
+      git remote set-url origin "https://gitlab-ci-token:${AUTH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+  script:
+    - |
+      if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        echo "ERROR: CLAUDE_CODE_OAUTH_TOKEN is not set."
+        echo "Add a masked CI variable in Settings -> CI/CD -> Variables."
+        echo "Get the value via: claude setup-token (run locally)."
+        exit 1
+      fi
+    - |
+      claude \
+        --allowedTools "Bash(glab:*),Bash(git:*),Read,Edit,Write" \
+        --permission-mode acceptEdits \
+        --verbose \
+        --output-format stream-json \
+        -p "$(cat <<PROMPT
+      You are Claude Code running inside a GitLab CI job for project ${CI_PROJECT_PATH}
+      on branch ${CI_COMMIT_REF_NAME} (commit ${CI_COMMIT_SHORT_SHA}).
+
+      Context: ${AI_FLOW_CONTEXT:-No external context provided. The current pipeline source is ${CI_PIPELINE_SOURCE}.}
+      Event:   ${AI_FLOW_EVENT:-pipeline-trigger}
+      Task:    ${AI_FLOW_INPUT:-Review the latest changes on this branch and suggest concrete improvements. If code changes are warranted, create a new branch named feature/<short-desc>, commit and push, then open a merge request via 'glab mr create'.}
+
+      Use glab CLI for GitLab operations (already authenticated).
+      Use git CLI for commits and pushes.
+      When you finish, summarize what you did. If you created an MR, include its URL.
+      PROMPT
+      )"

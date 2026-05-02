@@ -1,0 +1,30 @@
+# Post Merge — Reusable template
+# Mirrors: .github/workflows/post-merge.yml
+#
+# Runs after a MR with "auto:merged" label is merged into main.
+# Records the merged MR to the auto:review-batch issue.
+#
+# Trigger: push to main (after MR merge), filtered by merge commit label
+# inside the script (looks up the MR from CI_COMMIT_SHA via the GitLab API).
+#
+# Required CI/CD variables:
+#   GITLAB_TOKEN — personal access token with api scope
+#
+# NOTE: original scripts use `gh` CLI (GitHub API).
+# Adapted to use the GitLab REST API directly via curl in the script.
+# Scripts live in .gitlab/scripts/post-merge/
+
+.job_post_merge:
+  image: alpine:latest
+  # Avoid concurrent post-merge runs racing on the same review-batch issue
+  resource_group: post-merge
+  before_script:
+    - apk add --no-cache bash curl jq coreutils
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/post-merge/update-review-issue.sh"
+  variables:
+    GL_TOKEN: "$GITLAB_TOKEN"
+    GL_REPO: "$CI_PROJECT_PATH"
+    # Pass commit SHA explicitly so the script can resolve the MR IID
+    # via /repository/commits/:sha/merge_requests when CI_MERGE_REQUEST_IID is unset.
+    CI_COMMIT_SHA: "$CI_COMMIT_SHA"

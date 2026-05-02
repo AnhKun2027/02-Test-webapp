@@ -1,0 +1,28 @@
+{
+  "config": {
+    "MD013": {
+      "line_length": 200,
+      "code_blocks": false,
+      "tables": false
+    },
+    "MD024": false,
+    "MD029": false,
+    "MD036": false,
+    "MD040": false,
+    "MD041": false,
+    "MD060": false
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "CLAUDE.md",
+    "CLAUDE-webapp.md",
+    "CODING-CONVENTION.md",
+    "public/js/CLAUDE.md",
+    ".claude/**",
+    ".github/**",
+    "docs/specs/**",
+    "node_modules/**"
+  ]
+}

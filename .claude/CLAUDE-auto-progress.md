@@ -1,0 +1,105 @@
+# 自動進行ルール（auto-progress）
+
+> このファイルは GitLab CI 環境（auto-implement scheduled polling）専用のルール。
+> ローカル対話セッションでは参照不要。
+> 元: GitHub Actions 版（becky3/shared-workflows）を GitLab CI 向けに調整。
+
+## 起動時の判断フロー
+
+1. Issueの内容を読む（タイトル、本文、全コメント）
+2. 仕様書の存在確認（`docs/specs/` がある場合、対応する仕様書があるか）
+   - あり + AC定義済み: 仕様書に従って実装を開始
+   - あり + AC未定義: ACを追加してから実装を開始
+   - なし + Issue具体的: 仕様書なしで直接実装に着手する
+   - なし + Issue曖昧: `auto:failed` 付与、不明点をIssueにコメントして停止
+3. 通常の開発ルール（仕様駆動開発）に従って実装
+4. 実装完了後、通常の手順で MR 作成まで行う（ターゲットブランチは `main`）
+5. ラベル更新は scan.sh が自動で行う:
+   - 開始時: `auto-implement` → `auto:in-progress`
+   - 成功時: `auto:in-progress` → `auto:pipeline`
+   - 失敗時: `auto:in-progress` → `auto:failed`
+
+## Git運用
+
+- MR のターゲットブランチは `main`（`glab mr create --target-branch main`）
+- `develop` ブランチは使用しない
+- ブランチ命名規則: `auto/issue-${ISSUE_IID}-${TIMESTAMP}`（scan.sh が指定）
+
+## Issue具体性の判定
+
+具体的と見なす: 入出力例あり、具体的な変更指示、バグ再現手順あり
+曖昧と見なす: 「検討」「改善」のみ、複数要求混在、外部仕様未確定
+
+## `auto:failed` ラベル
+
+`auto:failed` ラベルが付いた Issue は scan.sh が `not[labels]=auto:failed` で除外するため自動処理されない。
+自動処理の失敗時に自動付与されるほか、管理者が手動で付与して緊急停止にも使う。
+再開するには `auto:failed` を除去し、`auto-implement` を再付与する。
+
+## 品質チェック
+
+以下の4ステップを順番に全て実行すること。
+途中で停止しないこと。全ステップ完了まで続けること。
+
+### ステップ 1/4: テスト実行
+
+`test-runner` エージェントを **フォアグラウンド**（`run_in_background: false`）で呼び出し、diff モードでテスト・品質チェックを実行する。
+
+- テストが存在しないプロジェクト・ディレクトリの場合はスキップ可
+- エージェントが「スキル未配置」を報告した場合は、リポジトリの構成から適切なテスト・lint コマンドを判断して直接実行する
+- Markdown のみの変更の場合、コードのテスト・lint はスキップ可（markdownlint のみ実行）
+- 失敗があれば修正して再実行。全て通過してから次へ進む
+
+### ステップ 2/4: コードレビュー
+
+`code-reviewer` エージェントを **フォアグラウンド**（`run_in_background: false`）で呼び出し、diff モードでコードレビューを実行する。
+
+- コード変更がない場合（ドキュメントのみの変更）はスキップ可
+- エージェントが返した指摘は、各指摘について対応すべきかそれぞれ判断し、修正する
+- **検出した問題のスキップ禁止**: テスト失敗・リント違反・型エラー・レビュー指摘を「対応範囲外」「既存問題」としてスキップしてはならない。軽微な問題はその場で修正し、大きな問題は Issue を作成して記録すること。判断に迷う問題は MR/Issue コメントに問題事項を記載し、作業を中断する
+
+### ステップ 3/4: ドキュメントレビュー
+
+`doc-reviewer` エージェントを **フォアグラウンド**（`run_in_background: false`）で呼び出し、diff モードでドキュメントレビューを実行する。
+
+- ドキュメント変更がなく、対応する仕様書も存在しない場合はスキップ可
+- 対応する仕様書が存在する場合は、実装のみの変更でも整合性チェックを実施すること
+
+**ここで停止しないこと。次のステップ4を必ず実行すること。**
+
+### ステップ 4/4: 完了処理（commit / push / MR作成 / Issue完了コメント）
+
+1. `git status --porcelain` で変更確認（空なら停止）
+2. `git add -A`（GitLab CI 環境ではリポジトリに機密情報がない前提のため許容）
+3. `git diff --cached --stat` で差分サマリ表示
+4. 変更内容からコミットメッセージ自動生成（優先順位: fix > feat > docs > ci）
+5. `git commit -m "生成したメッセージ"`
+6. `BRANCH=$(git branch --show-current) && git push origin "$BRANCH"`
+7. `glab mr create --target-branch main --title "..." --description "Closes #${ISSUE_IID}" --label "auto:pipeline"`
+8. `glab issue note <Issue番号> --message "対応が完了しました。MR <MR番号> をご確認ください。"`
+
+エラー時: ステップ1-7は失敗で停止。ステップ8は警告して続行（MRは作成済み）。
+commitが成功していない状態で push しないこと。
+
+## GitLab CI 環境（claude CLI）の制約
+
+**対話不可の制約**:
+
+- `AskUserQuestion` ツールは使用不可
+- 不明点があっても質問せずに、以下の原則で自分で判断して進めること:
+  - 情報不足で判断できない場合は、最も妥当な選択を行い、その判断理由をコメントに明記する
+  - 曖昧な指示は、CLAUDE.md のルールに基づいて解釈する
+  - 完璧を求めず、まず動くものを作ることを優先する
+
+**Issueから実装する際の注意点**:
+
+- **Issue本文だけでなく、コメントも必ず確認すること**
+  - コメントに追加の要件・制約・補足情報が書かれていることがある
+  - コメントの要件が仕様書のACに反映されていない場合は、ACに追加してから実装する
+
+**タスク完了時の必須アクション**:
+
+- 実装や設計書の作成を依頼された場合は、**必ず MR を作成すること**（`glab mr create --target-branch main`）
+  - 調査のみ・設計案の提示のみの場合は MR 不要（Issue コメントで回答する）
+- MRを作成したら、対応した Issue の description で `Closes #${ISSUE_IID}` を参照する
+- Issue にコメントで完了報告を投稿すること（`glab issue note`）

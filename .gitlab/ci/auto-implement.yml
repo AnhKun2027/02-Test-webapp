@@ -1,0 +1,156 @@
+# Auto-implement — Reusable template
+# Mirrors: .github/workflows/claude.yml (claude-auto-implement job)
+#
+# Polls open issues with "auto-implement" label on a schedule.
+# For each matching issue: Claude creates a branch, implements the feature, and opens an MR.
+#
+# Label lifecycle:
+#   auto-implement → auto:in-progress → auto:pipeline  (success)
+#                                     → auto:failed     (failure)
+#
+# Required CI/CD variables (Settings → CI/CD → Variables):
+#   GITLAB_TOKEN            — personal access token (api scope)
+#   CLAUDE_CODE_OAUTH_TOKEN — Claude Max OAuth token (claude setup-token)
+#
+# Required pipeline schedule (Settings → CI/CD → Schedules):
+#   cron: "*/5 * * * *" (every 5 min), branch: main
+
+.job_auto_implement:
+  image: node:22-slim
+  # resource_group: ngăn chạy trùng cùng project (đối ứng concurrency.group của GitHub)
+  resource_group: auto-implement-${CI_PROJECT_ID}
+  variables:
+    GIT_STRATEGY: fetch
+    GIT_DEPTH: "0"
+    # Bot identity (parameterizable, đối ứng GitHub bot_name / bot_id)
+    BOT_NAME: "${BOT_NAME:-claude-bot}"
+    BOT_DISPLAY_NAME: "${BOT_DISPLAY_NAME:-Claude Code}"
+    GIT_AUTHOR_NAME: "${BOT_DISPLAY_NAME:-Claude Code}"
+    GIT_AUTHOR_EMAIL: "claude-code@users.noreply.gitlab.com"
+    GIT_COMMITTER_NAME: "${BOT_DISPLAY_NAME:-Claude Code}"
+    GIT_COMMITTER_EMAIL: "claude-code@users.noreply.gitlab.com"
+    GL_TOKEN: "$GITLAB_TOKEN"
+  before_script:
+    - apt-get update --quiet && apt-get install --yes curl git ca-certificates jq && rm -rf /var/lib/apt/lists/*
+    - npm install -g @anthropic-ai/claude-code
+    # Install glab CLI
+    - |
+      GLAB_VERSION=$(curl -s "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases" \
+        | jq -r '.[0].tag_name')
+      curl -sLo /tmp/glab.tar.gz \
+        "https://gitlab.com/gitlab-org/cli/-/releases/${GLAB_VERSION}/downloads/glab_${GLAB_VERSION#v}_linux_amd64.tar.gz"
+      tar -xzf /tmp/glab.tar.gz -C /tmp
+      mv /tmp/bin/glab /usr/local/bin/glab
+      chmod +x /usr/local/bin/glab
+    - git config --global user.name "$GIT_AUTHOR_NAME"
+    - git config --global user.email "$GIT_AUTHOR_EMAIL"
+    # Authenticate glab + git remote with GITLAB_TOKEN (write access needed to push branches)
+    - |
+      mkdir -p ~/.config/glab-cli
+      cat > ~/.config/glab-cli/config.yml <<EOF
+      hosts:
+        ${CI_SERVER_HOST}:
+          token: ${GITLAB_TOKEN}
+          api_host: ${CI_SERVER_HOST}
+          user: ${BOT_NAME}
+      check_update: "false"
+      git_protocol: https
+      EOF
+      chmod 600 ~/.config/glab-cli/config.yml
+      git remote set-url origin "https://gitlab-ci-token:${GITLAB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+  script:
+    - |
+      # Cancel pending pipelines from same schedule to prevent queue buildup
+      PENDING=$(curl -sS --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines?status=pending&source=schedule&per_page=20" \
+        | jq -r '.[].id // empty')
+      for pid in $PENDING; do
+        [ "$pid" != "$CI_PIPELINE_ID" ] && \
+          curl -sS --request POST --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$pid/cancel" > /dev/null
+      done
+    - |
+      if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        echo "ERROR: CLAUDE_CODE_OAUTH_TOKEN is not set."
+        echo "Set it in Settings → CI/CD → Variables (masked)."
+        exit 1
+      fi
+      if [ -z "${GITLAB_TOKEN:-}" ]; then
+        echo "ERROR: GITLAB_TOKEN is not set."
+        echo "Set it in Settings → CI/CD → Variables (masked)."
+        exit 1
+      fi
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-implement/scan.sh"
+  timeout: 60 minutes
+  allow_failure: false
+
+poll-claude-mentions:
+  # Quét @claude mention trên issues + MRs theo cửa sổ thời gian.
+  # Đối ứng GitHub claude.yml job "claude" (issue_comment / pr_review_comment trigger).
+  # GitLab CI không có comment-trigger native -> dùng schedule poll.
+  #
+  # Schedule khuyến nghị: cron "*/2 * * * *" (mỗi 2 phút), branch: main,
+  # cộng với CI variable POLL_WINDOW_MINUTES=10 để có overlap chống miss event.
+  stage: ai
+  image: node:22-slim
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y --no-install-recommends curl jq ca-certificates git
+    - npm install -g @anthropic-ai/claude-code
+  variables:
+    POLL_WINDOW_MINUTES: "10"
+    GL_TOKEN: "$GITLAB_TOKEN"
+    ALLOWED_USERS: "${ALLOWED_USERS:-an145,AnhKun2027}"
+    BOT_NAME: "${BOT_NAME:-claude-bot}"
+    BOT_DISPLAY_NAME: "${BOT_DISPLAY_NAME:-Claude Code}"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+      allow_failure: true
+  script:
+    - |
+      if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        echo "ERROR: CLAUDE_CODE_OAUTH_TOKEN is not set."
+        exit 1
+      fi
+      if [ -z "${GITLAB_TOKEN:-}" ]; then
+        echo "ERROR: GITLAB_TOKEN is not set."
+        exit 1
+      fi
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/auto-implement/poll-mentions.sh"
+  timeout: 20 minutes
+  allow_failure: true
+
+reset-stale-in-progress:
+  stage: ai
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  variables:
+    STALE_HOURS: "4"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: always
+  script:
+    - |
+      # C2 fix: alpine busybox date does NOT support "X hours ago" syntax (GNU)
+      # nor "-v-XH" syntax (BSD). Use epoch math which busybox supports via "@N".
+      SINCE_EPOCH=$(( $(date -u +%s) - STALE_HOURS*3600 ))
+      SINCE=$(date -u -d "@${SINCE_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)
+      ISSUES=$(curl -sS --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/issues?labels=auto:in-progress&updated_before=${SINCE}&per_page=20")
+      echo "$ISSUES" | jq -r '.[].iid' | while read -r IID; do
+        echo "Resetting stale issue #$IID (stuck > ${STALE_HOURS}h)"
+        curl -fsS --request POST \
+          --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          --header "Content-Type: application/json" \
+          --data "{\"body\":\"⚠️ Auto-reset: label \`auto:in-progress\` removed after ${STALE_HOURS}h inactivity. Resetting to \`auto-implement\` for retry.\"}" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/issues/$IID/notes" > /dev/null
+        curl -fsS --request PUT \
+          --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          --data "remove_labels=auto:in-progress&add_labels=auto-implement" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/issues/$IID" > /dev/null
+        echo "Reset issue #$IID"
+      done

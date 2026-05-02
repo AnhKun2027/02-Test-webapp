@@ -1,0 +1,27 @@
+# Late Review Scanner — Reusable template
+# Mirrors: .github/workflows/late-review-scanner.yml
+#
+# Scans merged MRs for unresolved review threads and logs them to an issue.
+# Triggered by scheduled pipeline or manual (web trigger).
+#
+# Required CI/CD variables:
+#   GITLAB_TOKEN — personal access token with api + read_api scope
+#
+# NOTE: original scripts use `gh` CLI (GitHub API).
+# Adapted to use the GitLab REST API directly via curl in scan.sh,
+# so we don't install glab here (saves ~30-60s per run).
+# Scripts live in .gitlab/scripts/late-review-scanner/
+
+.job_late_review_scan:
+  image: alpine:latest
+  # Cancel older queued runs to avoid stacking when scheduled hourly
+  resource_group: late-review-scan
+  before_script:
+    - apk add --no-cache bash curl jq coreutils
+  script:
+    - bash "$CI_PROJECT_DIR/.gitlab/scripts/late-review-scanner/scan.sh"
+  variables:
+    SCAN_HOURS: "24"
+    GL_TOKEN: "$GITLAB_TOKEN"
+    GL_REPO: "$CI_PROJECT_PATH"
+  timeout: 10 minutes
